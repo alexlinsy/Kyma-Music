@@ -1,0 +1,27 @@
+
+> ui@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.117:3000
+- Environments: .env.local
+✓ Ready in 427ms
+
+[TTS] Synthesizing: "Testing the British voice agai..." using en-GB-SoniaNeural
+ POST /api/tts 200 in 1640ms (next.js: 326ms, application-code: 1314ms)
+ GET / 200 in 399ms (next.js: 165ms, application-code: 234ms)
+ GET / 200 in 59ms (next.js: 3ms, application-code: 55ms)
+ GET / 200 in 51ms (next.js: 3ms, application-code: 48ms)
+Gemini Raw Response: {
+    "speech": "Hello there! A rather quiet hour for music, wouldn't you say? Since it's currently sunny and you're relaxing, perhaps something smooth and instrumental to match the atmosphere? Let's ease into the day with a touch of sophisticated chill.",
+    "tracks": [
+        "So What - Miles Davis",
+        "L.A. Beat - FKJ"
+    ],
+    "reasoning": "The user is relaxing on a sunny day. Miles Davis and FKJ align with their jazz and electronic preferences, and their smooth styles are suitable for a relaxed atmosphere. The early morning time also calls for something less intense."
+}
+ POST /api/chat 200 in 1053ms (next.js: 42ms, application-code: 1011ms)
+[TTS] Synthesizing: "Hello there! A rather quiet ho..." using en-GB-SoniaNeural
+ POST /api/tts?t=1776938283316 200 in 4.4s (next.js: 4ms, application-code: 4.4s)
+[?25h
