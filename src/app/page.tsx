@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ChatWindow from '@/components/ChatWindow';
 import TasteOnboarding from '@/components/TasteOnboarding';
 import RoutineSettings from '@/components/RoutineSettings';
-import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal } from 'lucide-react';
+import MoodSettings from '@/components/MoodSettings';
+import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal, SlidersHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpotify } from '@/hooks/useSpotify';
 import { generateSpeech } from '@/lib/tts';
@@ -18,7 +19,8 @@ export default function Home() {
   const [djScript, setDjScript] = useState<string>("Welcome back to Kyma. Shall we begin our musical journey today?");
   const [userPrefs, setUserPrefs] = useState<any>(null);
   const [isTasteModalOpen, setIsTasteModalOpen] = useState(false);
-  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+    const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+  const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
@@ -291,13 +293,16 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => syncPlaylists(token)} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10 ${isSyncing ? 'opacity-50 cursor-wait' : ''}`}>
-            <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} /> <span className="text-[11px] font-bold uppercase tracking-wider">{isSyncing ? 'Syncing' : 'Sync'}</span>
+            <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} /> <span className="text-[11px] font-bold uppercase tracking-wider">{isSyncing ? 'Syncing...' : 'Sync For Preference'}</span>
           </button>
           <button onClick={() => setIsTasteModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10">
             <Heart size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Taste</span>
           </button>
-          <button onClick={() => setIsRoutineModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10">
+                    <button onClick={() => setIsRoutineModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10">
             <Calendar size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Routine</span>
+          </button>
+          <button onClick={() => setIsMoodModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10">
+            <SlidersHorizontal size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Mood</span>
           </button>
         </div>
       </nav>
@@ -394,10 +399,15 @@ export default function Home() {
       </div>
 
       <TasteOnboarding isOpen={isTasteModalOpen} onClose={() => setIsTasteModalOpen(false)} initialData={userPrefs} onSave={(data) => { setUserPrefs(data); log("Taste updated."); }} />
-      <RoutineSettings isOpen={isRoutineModalOpen} onClose={() => setIsRoutineModalOpen(false)} />
+            <RoutineSettings isOpen={isRoutineModalOpen} onClose={() => setIsRoutineModalOpen(false)} />
+      <MoodSettings isOpen={isMoodModalOpen} onClose={() => setIsMoodModalOpen(false)} />
 
       <footer className="mt-8 py-12 border-t border-white/5 text-center flex flex-col items-center gap-6">
-        <p className="text-zinc-600 text-[11px] tracking-tight max-w-xs mx-auto leading-loose">Kyma v1.2 • Notion Design System • Spotify Audio Engine</p>
+        <div className="text-zinc-600 text-[11px] tracking-tight max-w-xs mx-auto leading-relaxed text-center">
+          {'Kyma v1.2 • Notion Design System • Spotify Audio Engine'.split(' • ').map(tech => (
+            <p key={tech}>{tech}</p>
+          ))}
+        </div>
         <button onClick={() => { localStorage.removeItem('spotify_token'); document.cookie = "spotify_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.reload(); }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-rose-500 transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-rose-500/20">Reset Environment</button>
       </footer>
     </main>
