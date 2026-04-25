@@ -77,7 +77,7 @@ const MoodSettings: React.FC<MoodSettingsProps> = ({ isOpen, onClose }) => {
                   className="w-full h-64 bg-black/40 p-4 rounded-xl border border-kyma-text/10 focus:ring-2 focus:ring-kyma-primary focus:outline-none font-mono text-sm resize-none custom-scrollbar"
                   value={rules}
                   onChange={(e) => setRules(e.target.value)}
-                  placeholder={"- On rainy days: Play more Jazz\\n- After 6pm: Play some Disco or Funk"}
+                  placeholder={"- Rainy Day: Cool Jazz, chill songs, etc..."}
                 />
               )}
             </div>

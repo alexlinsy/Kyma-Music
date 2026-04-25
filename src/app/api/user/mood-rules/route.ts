@@ -15,13 +15,13 @@ export async function GET() {
       .single();
 
     if (error || !data || !data.mood_rules) {
-      return new NextResponse("No mood rules set.");
+      return NextResponse.json({ content: '' });
     }
 
-    return new NextResponse(data.mood_rules);
+    return NextResponse.json({ content: data.mood_rules });
   } catch (error) {
     console.error('[API] Mood Rules GET Error:', error);
-    return new NextResponse('Failed to read mood rules.', { status: 500 });
+    return NextResponse.json({ content: '' }, { status: 500 });
   }
 }
 
@@ -32,17 +32,17 @@ export async function POST(req: Request) {
 
     if (!user) return new NextResponse('Unauthorized', { status: 401 });
 
-    const markdown = await req.text();
+    const { content } = await req.json();
     
     const { error } = await supabase
       .from('user_preferences')
-      .upsert({ user_id: user.id, mood_rules: markdown }, { onConflict: 'user_id' });
+      .upsert({ user_id: user.id, mood_rules: content }, { onConflict: 'user_id' });
 
     if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[API] Mood Rules POST Error:', error);
-    return new NextResponse('Failed to save mood rules.', { status: 500 });
+    return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
