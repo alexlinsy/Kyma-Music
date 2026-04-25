@@ -3,16 +3,17 @@ import { askGemini } from '@/lib/gemini';
 
 export async function POST(req: Request) {
   try {
-    const { message } = await req.json();
+    const { message, type, track, history } = await req.json();
     
-    // Simulate some environment data
     const environment = {
       time: new Date().toLocaleTimeString(),
       weather: "Sunny",
-      activity: "Relaxing"
+      activity: "Relaxing",
+      history
     };
 
-    const result = await askGemini(message, environment);
+    const query = type === 'intro' ? `${track?.name} by ${track?.artists?.map((a:any)=>a.name).join(', ')}` : message;
+    const result = await askGemini(query, environment, type || 'chat');
     
     return NextResponse.json(result);
   } catch (error) {

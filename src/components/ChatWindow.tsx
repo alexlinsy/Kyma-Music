@@ -10,9 +10,11 @@ interface Message {
 
 interface ChatWindowProps {
   onResponse?: (speech: string, tracks: string[]) => void;
+  onSendRequest?: () => boolean;
+  history?: string[];
 }
 
-export default function ChatWindow({ onResponse }: ChatWindowProps) {
+export default function ChatWindow({ onResponse, onSendRequest, history = [] }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: "Hello, I'm Kyma. What's on your mind today?" }
   ]);
@@ -28,6 +30,7 @@ export default function ChatWindow({ onResponse }: ChatWindowProps) {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
+    if (onSendRequest && !onSendRequest()) return;
 
     const userMsg = input.trim();
     setInput('');
@@ -38,7 +41,7 @@ export default function ChatWindow({ onResponse }: ChatWindowProps) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg })
+        body: JSON.stringify({ message: userMsg, history })
       });
       const data = await res.json();
       

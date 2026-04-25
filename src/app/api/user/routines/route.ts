@@ -1,34 +1,46 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const USER_DIR = path.resolve(process.cwd(), '../user');
-const ROUTINE_PATH = path.join(USER_DIR, 'routines.json');
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
-    if (!fs.existsSync(ROUTINE_PATH)) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('routines')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !data || !data.routines) {
       return NextResponse.json({ routines: [] });
     }
-    const content = fs.readFileSync(ROUTINE_PATH, 'utf-8').trim();
-    if (!content) {
-      return NextResponse.json({ routines: [] });
-    }
-    const data = JSON.parse(content);
-    return NextResponse.json(data);
+
+    return NextResponse.json({ routines: data.routines });
   } catch (error) {
     console.error('[API] Routines GET Error:', error);
-    return NextResponse.json({ error: 'Failed to read routines' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to get routines' }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = await req.json();
-    if (!fs.existsSync(USER_DIR)) {
-      fs.mkdirSync(USER_DIR, { recursive: true });
-    }
-    fs.writeFileSync(ROUTINE_PATH, JSON.stringify(body, null, 2));
+    const { routines } = body;
+    
+    const { error } = await supabase
+      .from('user_preferences')
+      .upsert({ user_id: user.id, routines: routines || [] }, { onConflict: 'user_id' });
+
+    if (error) throw error;
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[API] Routines POST Error:', error);

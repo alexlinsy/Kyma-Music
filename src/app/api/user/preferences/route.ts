@@ -1,23 +1,22 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const USER_DIR = path.resolve(process.cwd(), '../user');
-const PREF_PATH = path.join(USER_DIR, 'preferences.json');
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
-    if (!fs.existsSync(PREF_PATH)) {
-      return NextResponse.json({ 
-        likedGenres: [], 
-        likedArtists: [], 
-        dislikedGenres: [],
-        isNewUser: true 
-      });
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
-    const content = fs.readFileSync(PREF_PATH, 'utf-8').trim();
-    if (!content) {
+
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('taste')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !data || !data.taste || Object.keys(data.taste).length === 0) {
       return NextResponse.json({ 
         likedGenres: [], 
         likedArtists: [], 
@@ -26,8 +25,7 @@ export async function GET() {
       });
     }
 
-    const data = JSON.parse(content);
-    return NextResponse.json({ ...data, isNewUser: false });
+    return NextResponse.json({ ...data.taste, isNewUser: false });
   } catch (error) {
     console.error('[API] Preferences GET Error:', error);
     return NextResponse.json({ error: 'Failed to read preferences' }, { status: 500 });
@@ -36,6 +34,13 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { likedGenres, likedArtists, dislikedGenres } = body;
     
@@ -46,10 +51,12 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString()
     };
 
-    if (!fs.existsSync(USER_DIR)) {
-      fs.mkdirSync(USER_DIR, { recursive: true });
-    }
-    fs.writeFileSync(PREF_PATH, JSON.stringify(prefs, null, 2));
+    const { error } = await supabase
+      .from('user_preferences')
+      .upsert({ user_id: user.id, taste: prefs }, { onConflict: 'user_id' });
+
+    if (error) throw error;
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[API] Preferences POST Error:', error);

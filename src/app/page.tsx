@@ -5,7 +5,8 @@ import ChatWindow from '@/components/ChatWindow';
 import TasteOnboarding from '@/components/TasteOnboarding';
 import RoutineSettings from '@/components/RoutineSettings';
 import MoodSettings from '@/components/MoodSettings';
-import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal, SlidersHorizontal, Sun, Moon } from 'lucide-react';
+import LoginModal from '@/components/LoginModal';
+import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal, SlidersHorizontal, Sun, Moon, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpotify } from '@/hooks/useSpotify';
 import { generateSpeech } from '@/lib/tts';
@@ -16,23 +17,31 @@ export default function Home() {
   const [volume, setVolume] = useState<number>(0.5);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [preMuteVolume, setPreMuteVolume] = useState<number>(0.5);
+  
+  const volumeRef = useRef<number>(0.5);
+  const isTtsPlaying = useRef<boolean>(false);
+  const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [djScript, setDjScript] = useState<string>("Welcome back to Kyma. Shall we begin our musical journey today?");
   const [userPrefs, setUserPrefs] = useState<any>(null);
   const [isTasteModalOpen, setIsTasteModalOpen] = useState(false);
-    const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginReason, setLoginReason] = useState<string>('');
+  const [user, setUser] = useState<any>(null);
+  const [freePlays, setFreePlays] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [isLightMode, setIsLightMode] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
-  
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentAudioUrl = useRef<string | null>(null);
   const lastSpokenText = useRef<string>("");
   const isProcessingNext = useRef<boolean>(false);
   const hasAutoSynced = useRef<boolean>(false);
   const queueRef = useRef<string[]>([]);
-  const trackEndedRef = useRef<() => void>(() => {});
+  const trackEndedRef = useRef<() => void>(() => { });
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => { queueRef.current = trackQueue; }, [trackQueue]);
@@ -49,13 +58,39 @@ export default function Home() {
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  const checkAILimit = (): boolean => {
+    if (!token) {
+      window.location.href = '/api/auth/spotify';
+      return false;
+    }
+    
+    if (user) return true; // unlimited
+    if (freePlays >= 5) {
+      setLoginReason("You've reached your 5 free AI interactions. Log in to unlock unlimited AI DJ access!");
+      setIsLoginModalOpen(true);
+      return false;
+    }
+    const newPlays = freePlays + 1;
+    setFreePlays(newPlays);
+    localStorage.setItem('kyma_ai_uses', newPlays.toString());
+    return true;
+  };
+
+  const requireAuth = (reason: string, callback: () => void) => {
+    if (user) callback();
+    else {
+      setLoginReason(reason);
+      setIsLoginModalOpen(true);
+    }
+  };
+
   const syncPlaylists = useCallback(async (accessToken: string) => {
     if (!accessToken) return;
     setIsSyncing(true);
     log("Sync: Robust Mode...");
-    
+
     let collections: any[] = [];
-    
+
     try {
       const spotifyFetch = async (url: string) => {
         const r = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -83,7 +118,7 @@ export default function Home() {
       // 2. Playlists
       log("Step 2: Playlists...");
       const plData = await spotifyFetch('https://api.spotify.com/v1/me/playlists?limit=8');
-      
+
       if (plData && plData.error) {
         log(`Playlist fetch stopped: ${plData.error}`);
       } else if (plData && plData.items && plData.items.length > 0) {
@@ -92,7 +127,7 @@ export default function Home() {
           log(`Syncing: ${pl.name}...`);
           await sleep(1500);
           const tData = await spotifyFetch(`https://api.spotify.com/v1/playlists/${pl.id}/tracks?limit=5`);
-          
+
           if (tData && tData.error) {
             log(`Skipped ${pl.name} (${tData.error})`);
             collections.push({ name: pl.name, id: pl.id, tracks: [] });
@@ -173,11 +208,12 @@ export default function Home() {
         const nextTrack = currentQueue[1];
         if (await playTrackAction(nextTrack)) setTrackQueue(prev => prev.slice(1));
       } else {
+        if (!checkAILimit()) return;
         log("Queue empty. Asking AI...");
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: "The queue is empty. Keep the radio going." })
+          body: JSON.stringify({ message: "The queue is empty. Keep the radio going.", history: trackHistoryRef.current })
         });
         const data = await res.json();
         setDjScript(data.speech);
@@ -214,7 +250,7 @@ export default function Home() {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
-    let normalizedAngle = angle + 90; 
+    let normalizedAngle = angle + 90;
     if (normalizedAngle < 0) normalizedAngle += 360;
     const percentage = normalizedAngle / 360;
     const seekMs = Math.floor(percentage * progress.duration);
@@ -224,9 +260,20 @@ export default function Home() {
 
   useEffect(() => {
     log("Kyma Initialized.");
+    const fetchUser = async () => {
+      const { createClient } = await import('@/lib/supabase/client');
+      const { data } = await createClient().auth.getUser();
+      setUser(data?.user || null);
+    };
+    fetchUser();
+    
+    const val = localStorage.getItem('kyma_ai_uses');
+    if (val) setFreePlays(parseInt(val, 10));
+
     const fetchPrefs = async () => {
       try {
         const res = await fetch('/api/user/preferences');
+        if (res.status === 401) return; // not logged in
         const data = await res.json();
         setUserPrefs(data);
         if (data && data.isNewUser) setIsTasteModalOpen(true);
@@ -235,7 +282,59 @@ export default function Home() {
       }
     };
     fetchPrefs();
-  }, []); // Use empty array to avoid HMR size change errors during development
+  }, []);
+
+  const lastAnnouncedTrackRef = useRef<string | null>(null);
+  const trackHistoryRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (currentTrack?.name) {
+       if (!trackHistoryRef.current.includes(currentTrack.name)) {
+          trackHistoryRef.current.push(currentTrack.name);
+          if (trackHistoryRef.current.length > 50) trackHistoryRef.current.shift();
+       }
+    }
+  }, [currentTrack?.name]);
+
+  useEffect(() => {
+    if (currentTrack?.id && isReady) {
+       if (lastAnnouncedTrackRef.current === currentTrack.id) return;
+       lastAnnouncedTrackRef.current = currentTrack.id;
+
+       const announce = async () => {
+          log(`Requesting DJ intro for ${currentTrack.name}`);
+          
+          if (!checkAILimit()) {
+             log("AI Limit reached. Pausing music and showing modal.");
+             if (player) player.pause();
+             return;
+          }
+
+          try {
+             const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                   type: 'intro', 
+                   track: currentTrack,
+                   history: trackHistoryRef.current
+                })
+             });
+             const data = await res.json();
+             if (data.speech) {
+                setDjScript(data.speech);
+                speak(data.speech);
+             }
+          } catch(e) {
+             log(`DJ Intro error: ${e}`);
+          }
+       };
+       
+       // Wait slightly before announcing to let the user hear the track intro
+       const timer = setTimeout(announce, 2000);
+       return () => clearTimeout(timer);
+    }
+  }, [currentTrack?.id, isReady, log, speak]); // Use empty array to avoid HMR size change errors during development
 
   useEffect(() => {
     const handleFirstInteraction = () => {
@@ -246,9 +345,71 @@ export default function Home() {
     return () => document.removeEventListener('click', handleFirstInteraction);
   }, [player, isReady, connect]);
 
+  const applyVolumeGradually = useCallback((targetRaw: number, duration: number = 800) => {
+    if (!player) return;
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    
+    player.getVolume().then((currVol: number) => {
+        const steps = 15;
+        const stepRate = duration / steps;
+        const delta = (targetRaw - currVol) / steps;
+        
+        let stepCount = 0;
+        fadeIntervalRef.current = setInterval(() => {
+            stepCount++;
+            currVol += delta;
+            if (stepCount >= steps) {
+                currVol = targetRaw;
+                if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+            }
+            player.setVolume(Math.max(0, Math.min(1, currVol))).catch(() => {});
+        }, stepRate);
+    }).catch(() => {
+        player.setVolume(targetRaw);
+    });
+  }, [player]);
+
+  const handleVolumeChange = useCallback((newVolume: number) => {
+    setVolume(newVolume);
+    volumeRef.current = newVolume;
+    if (newVolume > 0) setIsMuted(false);
+    
+    if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+    const effectiveVolume = isTtsPlaying.current ? newVolume * 0.15 : newVolume;
+    if (player) player.setVolume(effectiveVolume).catch((err: any) => log(`Vol err: ${err.message}`));
+  }, [player, log]);
+
+  const toggleMute = useCallback(() => {
+    if (isMuted) { handleVolumeChange(preMuteVolume || 0.5); setIsMuted(false); }
+    else { setPreMuteVolume(volume); handleVolumeChange(0); setIsMuted(true); }
+  }, [isMuted, preMuteVolume, volume, handleVolumeChange]);
+
   useEffect(() => {
-    if (typeof window !== 'undefined' && !audioRef.current) audioRef.current = new Audio();
-  }, []);
+    if (typeof window === 'undefined') return;
+    if (!audioRef.current) audioRef.current = new Audio();
+    
+    const onPlay = () => {
+        isTtsPlaying.current = true;
+        applyVolumeGradually(volumeRef.current * 0.15, 800);
+    };
+    
+    const onRestore = () => {
+        if (!isTtsPlaying.current) return;
+        isTtsPlaying.current = false;
+        applyVolumeGradually(volumeRef.current, 2000);
+    };
+
+    const audio = audioRef.current;
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('ended', onRestore);
+    audio.addEventListener('pause', onRestore);
+    
+    return () => {
+        audio.removeEventListener('play', onPlay);
+        audio.removeEventListener('ended', onRestore);
+        audio.removeEventListener('pause', onRestore);
+    };
+  }, [applyVolumeGradually]);
 
   useEffect(() => {
     if (isLightMode) document.documentElement.classList.add('light');
@@ -270,16 +431,7 @@ export default function Home() {
     if (player) { if (!isReady) connect(); player.togglePlay(); }
   };
 
-  const handleVolumeChange = (newVolume: number) => {
-    setVolume(newVolume);
-    if (newVolume > 0) setIsMuted(false);
-    if (player) player.setVolume(newVolume).catch((err: any) => log(`Vol err: ${err.message}`));
-  };
-
-  const toggleMute = () => {
-    if (isMuted) { handleVolumeChange(preMuteVolume || 0.5); setIsMuted(false); }
-    else { setPreMuteVolume(volume); handleVolumeChange(0); setIsMuted(true); }
-  };
+  // Volume control functions moved up to fix Temporal Dead Zone
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -318,18 +470,30 @@ export default function Home() {
           <button onClick={() => setIsLightMode(!isLightMode)} className="text-kyma-text/50 hover:text-kyma-text transition-colors" title="Toggle Light/Dark Mode">
             {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
           </button>
+          
+          {user ? (
+            <div className="flex items-center gap-1.5 ml-2 pl-4 border-l border-kyma-text/10 cursor-pointer" title={user.email}>
+               <div className="w-6 h-6 rounded-full bg-kyma-primary/20 border border-kyma-primary/40 flex items-center justify-center">
+                  <UserIcon size={12} className="text-kyma-primary" />
+               </div>
+            </div>
+          ) : (
+            <button onClick={() => { setLoginReason(""); setIsLoginModalOpen(true); }} className="ml-2 pl-4 border-l border-kyma-text/10 text-[10px] font-bold uppercase tracking-wider text-kyma-text/70 hover:text-kyma-primary transition-colors flex items-center gap-1.5">
+               <UserIcon size={12} /> Log In / Sign Up
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => syncPlaylists(token)} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'} ${isSyncing ? 'opacity-50 cursor-wait' : ''}`}>
+          <button onClick={() => requireAuth("Backing up Playlists to your base requires an account.", () => syncPlaylists(token))} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'} ${isSyncing ? 'opacity-50 cursor-wait' : ''}`}>
             <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} /> <span className="text-[11px] font-bold uppercase tracking-wider">{isSyncing ? 'Syncing...' : 'Sync For Preference'}</span>
           </button>
-          <button onClick={() => setIsTasteModalOpen(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
+          <button onClick={() => requireAuth("Customizing Taste settings requires an account.", () => setIsTasteModalOpen(true))} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <Heart size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Taste</span>
           </button>
-          <button onClick={() => setIsRoutineModalOpen(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
+          <button onClick={() => requireAuth("Automating Routines requires an account.", () => setIsRoutineModalOpen(true))} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <Calendar size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Routine</span>
           </button>
-          <button onClick={() => setIsMoodModalOpen(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
+          <button onClick={() => requireAuth("Setting up Mood rules requires an account.", () => setIsMoodModalOpen(true))} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <SlidersHorizontal size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Mood</span>
           </button>
         </div>
@@ -337,7 +501,7 @@ export default function Home() {
 
       <div className="max-w-[1200px] mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12 relative">
         <div className="lg:col-span-7 flex flex-col gap-8">
-          
+
           <AnimatePresence>
             {isDevMode && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
@@ -374,7 +538,7 @@ export default function Home() {
                 <circle cx="50" cy="50" r="45.5" fill="none" stroke="transparent" strokeWidth="8" />
                 <motion.circle cx="50" cy="50" r="45.5" fill="none" stroke="var(--kyma-primary)" strokeWidth="0.8" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: progressPercent / 100 }} style={{ filter: `drop-shadow(0 0 3px var(--kyma-glow))` }} transition={{ type: "tween", ease: "linear", duration: 1 }} />
               </svg>
-              <div 
+              <div
                 className="relative w-[90%] h-[90%] rounded-full overflow-hidden z-10 border border-kyma-text/5 bg-kyma-panel drop-shadow-[0_15px_30px_rgba(0,0,0,0.4)]"
                 style={{ WebkitMaskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)', maskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)' }}
               >
@@ -399,18 +563,18 @@ export default function Home() {
             <div className="mt-10 text-center space-y-2">
               <motion.h2 key={currentTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-2xl font-bold tracking-tight text-kyma-primary line-clamp-1 px-4">{currentTrack ? currentTrack.name : 'Ready to Broadcast'}</motion.h2>
               <div className="flex flex-col items-center">
-                <motion.p key={currentTrack?.artists?.[0]?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[#a39e98] text-sm font-medium tracking-wide uppercase">{currentTrack ? currentTrack.artists.map((a:any) => a.name).join(', ') : 'Kyma Music'}</motion.p>
+                <motion.p key={currentTrack?.artists?.[0]?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[#a39e98] text-sm font-medium tracking-wide uppercase">{currentTrack ? currentTrack.artists.map((a: any) => a.name).join(', ') : 'Kyma Music'}</motion.p>
                 <span className="text-[10px] font-mono text-zinc-600 tabular-nums font-bold mt-1.5 opacity-80">{formatTime(progress.position)} / {formatTime(progress.duration)}</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-14 py-4">
-             <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={() => player?.previousTrack()}><SkipBack size={32} /></button>
-             <button onClick={togglePlay} className="w-20 h-20 bg-kyma-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-kyma-primary/40">
-               {isPlaying ? <div className="w-6 h-6 bg-white rounded-sm" /> : <Play size={36} fill="white" className="ml-1.5" />}
-             </button>
-             <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={manualSkip}><SkipForward size={32} /></button>
+            <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={() => player?.previousTrack()}><SkipBack size={32} /></button>
+            <button onClick={togglePlay} className="w-20 h-20 bg-kyma-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-kyma-primary/40">
+              {isPlaying ? <div className="w-6 h-6 bg-white rounded-sm" /> : <Play size={36} fill="white" className="ml-1.5" />}
+            </button>
+            <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={manualSkip}><SkipForward size={32} /></button>
           </div>
         </div>
 
@@ -421,7 +585,7 @@ export default function Home() {
             <AnimatePresence mode="wait"><motion.div key={djScript} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-lg leading-relaxed text-kyma-text font-medium italic min-h-[4rem]">"{djScript}"</motion.div></AnimatePresence>
             {trackQueue.length > 1 && (<div className="mt-4 p-3 bg-black/40 rounded-xl border border-white/5 backdrop-blur-sm"><span className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest block mb-1.5">Up Next</span><div className="text-xs text-zinc-300 truncate font-medium">{trackQueue[1]}</div></div>)}
           </motion.div>
-          <ChatWindow onResponse={handleAiResponse} />
+          <ChatWindow onResponse={handleAiResponse} onSendRequest={checkAILimit} history={trackHistoryRef.current} />
           <div className="flex flex-wrap gap-2">
             {['LO-FI', 'MORNING', 'FOCUS', 'AI-CURATED'].map(tag => (<span key={tag} className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[9px] font-bold text-zinc-600 tracking-tighter hover:text-zinc-400 hover:border-zinc-700 transition-colors cursor-default">{tag}</span>))}
           </div>
@@ -435,8 +599,9 @@ export default function Home() {
       </div>
 
       <TasteOnboarding isOpen={isTasteModalOpen} onClose={() => setIsTasteModalOpen(false)} initialData={userPrefs} onSave={(data) => { setUserPrefs(data); log("Taste updated."); }} />
-            <RoutineSettings isOpen={isRoutineModalOpen} onClose={() => setIsRoutineModalOpen(false)} />
+      <RoutineSettings isOpen={isRoutineModalOpen} onClose={() => setIsRoutineModalOpen(false)} />
       <MoodSettings isOpen={isMoodModalOpen} onClose={() => setIsMoodModalOpen(false)} />
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} reason={loginReason} />
 
       <footer className="mt-8 py-12 border-t border-white/5 text-center flex flex-col items-center gap-6">
         <div className="text-zinc-600 text-[11px] tracking-tight max-w-xs mx-auto leading-relaxed text-center">
@@ -444,7 +609,18 @@ export default function Home() {
             <p key={tech}>{tech}</p>
           ))}
         </div>
-        <button onClick={() => { localStorage.removeItem('spotify_token'); document.cookie = "spotify_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.reload(); }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-rose-500 transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-rose-500/20">Reset Environment</button>
+        <div className="flex gap-4">
+          {user && (
+            <button onClick={async () => {
+              const { createClient } = await import('@/lib/supabase/client');
+              const supabase = createClient();
+              await supabase.auth.signOut();
+              window.location.reload();
+            }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-white transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-white/20">Sign Out</button>
+          )}
+
+          <button onClick={() => { localStorage.removeItem('spotify_token'); document.cookie = "spotify_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.reload(); }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-rose-500 transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-rose-500/20">Reset Spotify</button>
+        </div>
       </footer>
     </main>
   );

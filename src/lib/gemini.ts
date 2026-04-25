@@ -3,7 +3,7 @@ import { getContext, buildSystemPrompt } from "./context";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-export async function askGemini(userInput: string, environment: any) {
+export async function askGemini(userInput: string, environment: any, type: string = 'chat') {
   if (!process.env.GEMINI_API_KEY) {
     return {
       speech: "配置错误：未检测到 GEMINI_API_KEY。请检查 .env.local 并重启 npm run dev。",
@@ -21,7 +21,18 @@ export async function askGemini(userInput: string, environment: any) {
     }
   });
 
-  const prompt = `
+  const prompt = type === 'intro' ? `
+    System Context:
+    ${systemPrompt}
+    
+    CRITICAL: YOU MUST RESPOND IN ENGLISH ONLY. NO CHINESE CHARACTERS ALLOWED IN "speech".
+    
+    Task: The user's Spotify player just started playing the track: ${userInput}.
+    Provide a very short, punchy, engaging AI DJ commentary (maximum 2 sentences) about this specific track. You can make a joke, mention a fun fact about the artist/song, or tie it into the environment (${environment.time}, ${environment.weather}, or just life context). 
+    CRITICAL: Keep "tracks" array completely EMPTY. Do not queue any new tracks. Just provide the "speech".
+    
+    Response:
+  ` : `
     System Context:
     ${systemPrompt}
     
@@ -40,7 +51,15 @@ export async function askGemini(userInput: string, environment: any) {
     
     // Strip markdown JSON blocks if present
     const cleanJson = text.replace(/```json\n?/, '').replace(/```\n?$/, '').trim();
-    return JSON.parse(cleanJson);
+    const parsed = JSON.parse(cleanJson);
+    
+    // Remove annoying conversation fillers that LLMs tend to generate
+    if (parsed.speech) {
+      parsed.speech = parsed.speech.replace(/^(ah,|ah!|ah |oh,|oh!|oh )/i, '').trim();
+      parsed.speech = parsed.speech.charAt(0).toUpperCase() + parsed.speech.slice(1);
+    }
+    
+    return parsed;
   } catch (error: any) {
     console.error("Gemini API Error details:", error);
     let detailedError = error.message || "Unknown error";

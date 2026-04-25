@@ -10,37 +10,37 @@ export interface UserContext {
   playlists: any;
 }
 
+import { createClient } from '@/lib/supabase/server';
+
 export async function getContext(): Promise<UserContext> {
-  const safeReadFile = (p: string) => fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : "";
-  const safeReadJson = (p: string, def: any) => {
-    try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf-8')) : def; }
-    catch { return def; }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const emptyContext = { taste: "No taste preference found.", routines: "No routines set.", moodRules: "No mood rules set.", playlists: [] };
+  
+  if (!user) return emptyContext;
+
+  const { data: prefs, error } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (error || !prefs) return emptyContext;
+
+  const taste = `Liked Genres: ${prefs.taste?.likedGenres?.join(', ') || 'Not set'}
+Liked Artists: ${prefs.taste?.likedArtists?.join(', ') || 'Not set'}
+Disliked Genres: ${prefs.taste?.dislikedGenres?.join(', ') || 'None'}`;
+
+  const routines = prefs.routines?.length ? 
+    prefs.routines.map((r: any) => `- ${r.time}: ${r.activity} (Music: ${r.musicStyle})`).join('\n') : "None set";
+
+  return { 
+    taste, 
+    routines, 
+    moodRules: prefs.mood_rules || "No mood rules set.", 
+    playlists: prefs.playlists || [] 
   };
-
-  let taste = "";
-  const prefPath = path.join(USER_DIR, 'preferences.json');
-  if (fs.existsSync(prefPath)) {
-    const prefs = safeReadJson(prefPath, {});
-    taste = `Liked Genres: ${prefs.likedGenres?.join(', ') || 'Not set'}
-Liked Artists: ${prefs.likedArtists?.join(', ') || 'Not set'}
-Disliked Genres: ${prefs.dislikedGenres?.join(', ') || 'None'}`;
-  } else {
-    taste = safeReadFile(path.join(USER_DIR, 'taste.md')) || "No taste preference found.";
-  }
-
-  let routines = "";
-  const routineJsonPath = path.join(USER_DIR, 'routines.json');
-  if (fs.existsSync(routineJsonPath)) {
-    const data = safeReadJson(routineJsonPath, {});
-    routines = data.routines?.map((r: any) => `- ${r.time}: ${r.activity} (Music: ${r.musicStyle})`).join('\n') || "None set";
-  } else {
-    routines = safeReadFile(path.join(USER_DIR, 'routines.md')) || "No routines set.";
-  }
-
-  const moodRules = safeReadFile(path.join(USER_DIR, 'mood-rules.md')) || "No mood rules set.";
-  const playlists = safeReadJson(path.join(USER_DIR, 'playlists.json'), []);
-
-  return { taste, routines, moodRules, playlists };
 }
 
 export function buildSystemPrompt(context: UserContext, environment: any): string {
@@ -62,11 +62,15 @@ CURRENT ENVIRONMENT:
 - Weather: ${environment.weather || 'Unknown'}
 - Activity: ${environment.activity || 'Unknown'}
 
+RECENTLY PLAYED TRACKS (STRICTLY AVOID REPEATING THESE):
+${environment.history?.length ? environment.history.join(', ') : 'None yet'}
+
 INSTRUCTIONS:
 1. Suggest tracks based on taste AND current routine time if applicable.
 2. Provide short "DJ Talk" segments.
 3. NO filler words like "Ah", "Oh", "Well". 
-4. Respond in JSON:
+4. DO NOT recommend any tracks listed in "RECENTLY PLAYED TRACKS". Be creative and diverse!
+5. Respond in JSON:
 {
     "speech": "DJ Talk in English",
     "tracks": ["Title - Artist", ...],

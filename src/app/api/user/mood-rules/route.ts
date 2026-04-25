@@ -1,31 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const USER_DIR = path.join(process.cwd(), '..', 'user');
-const MOOD_RULES_PATH = path.join(USER_DIR, 'mood-rules.md');
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
-    if (fs.existsSync(MOOD_RULES_PATH)) {
-      const content = fs.readFileSync(MOOD_RULES_PATH, 'utf-8');
-      return NextResponse.json({ content });
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('mood_rules')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !data || !data.mood_rules) {
+      return new NextResponse("No mood rules set.");
     }
-    return NextResponse.json({ content: '' });
+
+    return new NextResponse(data.mood_rules);
   } catch (error) {
-    return NextResponse.json({ message: 'Error reading mood rules', error }, { status: 500 });
+    console.error('[API] Mood Rules GET Error:', error);
+    return new NextResponse('Failed to read mood rules.', { status: 500 });
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { content } = await req.json();
-    if (!fs.existsSync(USER_DIR)) {
-      fs.mkdirSync(USER_DIR, { recursive: true });
-    }
-    fs.writeFileSync(MOOD_RULES_PATH, content, 'utf-8');
-    return NextResponse.json({ message: 'Mood rules saved' });
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return new NextResponse('Unauthorized', { status: 401 });
+
+    const markdown = await req.text();
+    
+    const { error } = await supabase
+      .from('user_preferences')
+      .upsert({ user_id: user.id, mood_rules: markdown }, { onConflict: 'user_id' });
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ message: 'Error saving mood rules', error }, { status: 500 });
+    console.error('[API] Mood Rules POST Error:', error);
+    return new NextResponse('Failed to save mood rules.', { status: 500 });
   }
 }

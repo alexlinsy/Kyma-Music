@@ -1,39 +1,27 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: Request) {
   try {
-    const { playlists } = await req.json();
-    console.log(`[API] Syncing ${playlists?.length} playlists`);
-    
-    const USER_DIR = path.resolve(process.cwd(), '../user');
-    const PLAYLIST_PATH = path.join(USER_DIR, 'playlists.json');
-    if (!fs.existsSync(USER_DIR)) {
-      fs.mkdirSync(USER_DIR, { recursive: true });
-    }
-    
-    const data = {
-      version: "1.0",
-      lastUpdated: new Date().toISOString(),
-      collections: (playlists || []).map((p: any) => ({
-        name: p.name,
-        description: p.description || "",
-        id: p.id,
-        tracks: p.tracks || []
-      }))
-    };
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    console.log(`[API] Overwriting file: ${PLAYLIST_PATH}`);
-    fs.writeFileSync(PLAYLIST_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json();
+    const { playlists } = body;
     
-    // Verify write
-    const stats = fs.statSync(PLAYLIST_PATH);
-    console.log(`[API] Success. File size: ${stats.size} bytes`);
-    
-    return NextResponse.json({ success: true, size: stats.size });
-  } catch (error: any) {
-    console.error('[API] Sync error:', error);
-    return NextResponse.json({ error: `Failed to sync: ${error.message}` }, { status: 500 });
+    const { error } = await supabase
+      .from('user_preferences')
+      .upsert({ user_id: user.id, playlists: playlists || [] }, { onConflict: 'user_id' });
+
+    if (error) throw error;
+
+    const dataSize = Buffer.byteLength(JSON.stringify(playlists), 'utf8');
+
+    return NextResponse.json({ success: true, size: dataSize });
+  } catch (error) {
+    console.error('[API] Playlists POST Error:', error);
+    return NextResponse.json({ error: 'Failed to save playlists' }, { status: 500 });
   }
 }
