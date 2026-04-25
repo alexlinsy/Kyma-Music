@@ -5,7 +5,7 @@ import ChatWindow from '@/components/ChatWindow';
 import TasteOnboarding from '@/components/TasteOnboarding';
 import RoutineSettings from '@/components/RoutineSettings';
 import MoodSettings from '@/components/MoodSettings';
-import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal, SlidersHorizontal } from 'lucide-react';
+import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal, SlidersHorizontal, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpotify } from '@/hooks/useSpotify';
 import { generateSpeech } from '@/lib/tts';
@@ -23,6 +23,7 @@ export default function Home() {
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -250,6 +251,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (isLightMode) document.documentElement.classList.add('light');
+    else document.documentElement.classList.remove('light');
+  }, [isLightMode]);
+
+  useEffect(() => {
     const cookies = document.cookie;
     const savedToken = cookies.split('; ').find(row => row.startsWith('spotify_token='))?.split('=')[1] || localStorage.getItem('spotify_token') || '';
     if (savedToken && savedToken !== token) setToken(savedToken);
@@ -283,25 +289,47 @@ export default function Home() {
   const progressPercent = progress.duration > 0 ? (progress.position / progress.duration) * 100 : 0;
 
   return (
-    <main className="min-h-screen bg-[#0f0f0f] text-[#f6f5f4] selection:bg-[#0075de]/30 font-inter text-sm">
-      <nav className="w-full h-14 border-b border-white/5 bg-[#0f0f0f]/80 backdrop-blur-xl flex items-center px-6 justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-[#0075de] rounded-md flex items-center justify-center shadow-lg shadow-[#0075de]/20">
-            <Radio size={14} className="text-white" />
+    <main className="min-h-screen bg-kyma-bg text-kyma-text selection:bg-kyma-primary/30 font-inter text-sm transition-colors duration-500 relative overflow-hidden z-0">
+      {/* Dynamic Ambient Album Background */}
+      <div className="absolute inset-0 pointer-events-none z-[-1]">
+        <AnimatePresence>
+          {isPlaying && currentTrack?.album?.images?.[0]?.url && (
+            <motion.img
+              key={currentTrack.album.images[0].url}
+              src={currentTrack.album.images[0].url}
+              initial={{ opacity: 0, scale: 1.2 }}
+              animate={{ opacity: isLightMode ? 0.45 : 0.35, scale: 1.5 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 2, ease: "easeInOut" }}
+              className="w-full h-full object-cover blur-[140px] transform-gpu saturate-150"
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
+      <nav className="w-full h-14 border-b border-kyma-text/5 bg-kyma-bg/80 backdrop-blur-xl flex items-center px-6 justify-between sticky top-0 z-50 transition-colors duration-500">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-kyma-primary rounded-md flex items-center justify-center shadow-lg shadow-kyma-primary/20">
+              <Radio size={14} className="text-white" />
+            </div>
+            <span className="font-bold tracking-tight text-sm text-kyma-primary">Kyma Music</span>
           </div>
-          <span className="font-bold tracking-tight text-sm">Kyma Music</span>
+          <button onClick={() => setIsLightMode(!isLightMode)} className="text-kyma-text/50 hover:text-kyma-text transition-colors" title="Toggle Light/Dark Mode">
+            {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => syncPlaylists(token)} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10 ${isSyncing ? 'opacity-50 cursor-wait' : ''}`}>
+          <button onClick={() => syncPlaylists(token)} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'} ${isSyncing ? 'opacity-50 cursor-wait' : ''}`}>
             <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} /> <span className="text-[11px] font-bold uppercase tracking-wider">{isSyncing ? 'Syncing...' : 'Sync For Preference'}</span>
           </button>
-          <button onClick={() => setIsTasteModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10">
+          <button onClick={() => setIsTasteModalOpen(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <Heart size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Taste</span>
           </button>
-                    <button onClick={() => setIsRoutineModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10">
+          <button onClick={() => setIsRoutineModalOpen(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <Calendar size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Routine</span>
           </button>
-          <button onClick={() => setIsMoodModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 rounded-full transition-all text-zinc-400 hover:text-white border border-transparent hover:border-white/10">
+          <button onClick={() => setIsMoodModalOpen(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <SlidersHorizontal size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Mood</span>
           </button>
         </div>
@@ -313,8 +341,8 @@ export default function Home() {
           <AnimatePresence>
             {isDevMode && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                <div className="bg-[#121212] border border-white/10 p-4 rounded-2xl font-mono text-[10px] space-y-1 mb-4 shadow-2xl">
-                  <div className="flex justify-between border-b border-white/5 pb-2 mb-2 text-[#0075de] font-bold uppercase tracking-widest">
+                <div className="bg-kyma-panel border border-kyma-text/5 p-4 rounded-2xl font-mono text-[10px] space-y-1 mb-4 shadow-2xl transition-colors duration-500">
+                  <div className="flex justify-between border-b border-kyma-text/5 pb-2 mb-2 text-kyma-primary font-bold uppercase tracking-widest">
                     <span>Diagnostic Terminal</span>
                     <span>{isReady ? 'System Ready' : 'Connecting...'}</span>
                   </div>
@@ -332,10 +360,10 @@ export default function Home() {
 
           <div className="flex items-center justify-center w-full px-4 pt-4">
             <div className="flex items-center gap-4 px-6 py-3 w-1/2">
-              <button onClick={toggleMute} className="text-zinc-500 hover:text-white transition-colors">{isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
+              <button onClick={toggleMute} className="text-zinc-500 hover:text-kyma-primary transition-colors">{isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
               <div className="group relative flex-1 h-1 bg-zinc-800 rounded-full">
                 <input type="range" min="0" max="1" step="0.01" value={volume} onChange={(e) => handleVolumeChange(parseFloat(e.target.value))} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50 appearance-none" />
-                <div className="h-full bg-zinc-600 rounded-full z-10 transition-all group-hover:bg-[#0075de]" style={{ width: `${volume * 100}%` }} />
+                <div className="h-full bg-kyma-primary rounded-full z-10 transition-all" style={{ width: `${volume * 100}%` }} />
               </div>
             </div>
           </div>
@@ -344,24 +372,32 @@ export default function Home() {
             <div className="relative w-96 h-96 flex items-center justify-center">
               <svg ref={svgRef} onClick={handleSeek} className="absolute inset-0 w-full h-full -rotate-90 overflow-visible z-30 cursor-pointer" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="45.5" fill="none" stroke="transparent" strokeWidth="8" />
-                <motion.circle cx="50" cy="50" r="45.5" fill="none" stroke="#0075de" strokeWidth="0.8" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: progressPercent / 100 }} style={{ filter: "drop-shadow(0 0 2px #0075de)" }} transition={{ type: "tween", ease: "linear", duration: 1 }} />
+                <motion.circle cx="50" cy="50" r="45.5" fill="none" stroke="var(--kyma-primary)" strokeWidth="0.8" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: progressPercent / 100 }} style={{ filter: `drop-shadow(0 0 3px var(--kyma-glow))` }} transition={{ type: "tween", ease: "linear", duration: 1 }} />
               </svg>
-              <div className="relative w-[90%] h-[90%] rounded-full shadow-2xl overflow-hidden z-10 border border-white/5 bg-[#121212]">
+              <div 
+                className="relative w-[90%] h-[90%] rounded-full overflow-hidden z-10 border border-kyma-text/5 bg-kyma-panel drop-shadow-[0_15px_30px_rgba(0,0,0,0.4)]"
+                style={{ WebkitMaskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)', maskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)' }}
+              >
                 <AnimatePresence mode="wait">
                   <motion.div key={currentTrack?.id || 'empty'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="w-full h-full rounded-full overflow-hidden relative group">
                     {currentTrack?.album?.images?.[0]?.url ? (
                       <img src={currentTrack.album.images[0].url} alt={currentTrack.name} className={`w-full h-full object-cover transition-transform duration-700 ${isPlaying ? 'animate-[spin_40s_linear_infinite]' : 'scale-95 opacity-80'}`} />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-[#1a1a1a]"><Music size={40} className="text-zinc-800" /></div>
+                      <div className="w-full h-full flex items-center justify-center bg-kyma-primary/10 transition-colors duration-500"><Music size={40} className="text-kyma-primary/60" /></div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10 pointer-events-none" />
+                    {/* Vinyl Texture & Gloss */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/50 via-transparent to-white/10 pointer-events-none" />
+                    <div className="absolute inset-0 mix-blend-overlay pointer-events-none opacity-60" style={{ background: 'conic-gradient(from 45deg, transparent 0%, rgba(255,255,255,0.6) 15%, transparent 30%, transparent 50%, rgba(255,255,255,0.6) 65%, transparent 80%)' }} />
                   </motion.div>
                 </AnimatePresence>
               </div>
+
+              {/* 3D Vinyl Hole Rim Effect */}
+              <div className="absolute z-20 w-[25.2%] h-[25.2%] rounded-full shadow-[inset_0_4px_10px_rgba(0,0,0,0.5),_0_2px_8px_rgba(0,0,0,0.2)] border border-black/10 pointer-events-none" />
             </div>
 
             <div className="mt-10 text-center space-y-2">
-              <motion.h2 key={currentTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-2xl font-bold tracking-tight text-white line-clamp-1 px-4">{currentTrack ? currentTrack.name : 'Ready to Broadcast'}</motion.h2>
+              <motion.h2 key={currentTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-2xl font-bold tracking-tight text-kyma-primary line-clamp-1 px-4">{currentTrack ? currentTrack.name : 'Ready to Broadcast'}</motion.h2>
               <div className="flex flex-col items-center">
                 <motion.p key={currentTrack?.artists?.[0]?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[#a39e98] text-sm font-medium tracking-wide uppercase">{currentTrack ? currentTrack.artists.map((a:any) => a.name).join(', ') : 'Kyma Music'}</motion.p>
                 <span className="text-[10px] font-mono text-zinc-600 tabular-nums font-bold mt-1.5 opacity-80">{formatTime(progress.position)} / {formatTime(progress.duration)}</span>
@@ -370,19 +406,19 @@ export default function Home() {
           </div>
 
           <div className="flex items-center justify-center gap-14 py-4">
-             <button className="text-zinc-500 hover:text-white transition-all active:scale-90" onClick={() => player?.previousTrack()}><SkipBack size={32} /></button>
-             <button onClick={togglePlay} className="w-20 h-20 bg-[#0075de] text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_15px_40px_rgba(0,117,222,0.4)]">
+             <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={() => player?.previousTrack()}><SkipBack size={32} /></button>
+             <button onClick={togglePlay} className="w-20 h-20 bg-kyma-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-kyma-primary/40">
                {isPlaying ? <div className="w-6 h-6 bg-white rounded-sm" /> : <Play size={36} fill="white" className="ml-1.5" />}
              </button>
-             <button className="text-zinc-500 hover:text-white transition-all active:scale-90" onClick={manualSkip}><SkipForward size={32} /></button>
+             <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={manualSkip}><SkipForward size={32} /></button>
           </div>
         </div>
 
         <div className="lg:col-span-5 flex flex-col gap-6">
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-[#181818] border border-white/5 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4"><div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-[#0075de] rounded-full animate-pulse" /><span className="text-[9px] font-bold text-[#0075de] uppercase tracking-widest">Live</span></div></div>
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-kyma-panel border border-kyma-text/5 rounded-2xl p-6 shadow-xl relative overflow-hidden transition-colors duration-500">
+            <div className="absolute top-0 right-0 p-4"><div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-kyma-primary rounded-full animate-pulse" /><span className="text-[9px] font-bold text-kyma-primary uppercase tracking-widest">Live</span></div></div>
             <div className="flex items-center gap-2 mb-4"><Music size={14} className="text-zinc-500" /><span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Kyma DJ On Air</span></div>
-            <AnimatePresence mode="wait"><motion.div key={djScript} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-lg leading-relaxed text-zinc-200 font-medium italic min-h-[4rem]">"{djScript}"</motion.div></AnimatePresence>
+            <AnimatePresence mode="wait"><motion.div key={djScript} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-lg leading-relaxed text-kyma-text font-medium italic min-h-[4rem]">"{djScript}"</motion.div></AnimatePresence>
             {trackQueue.length > 1 && (<div className="mt-4 p-3 bg-black/40 rounded-xl border border-white/5 backdrop-blur-sm"><span className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest block mb-1.5">Up Next</span><div className="text-xs text-zinc-300 truncate font-medium">{trackQueue[1]}</div></div>)}
           </motion.div>
           <ChatWindow onResponse={handleAiResponse} />
@@ -394,7 +430,7 @@ export default function Home() {
 
       <div className="fixed bottom-6 right-6 z-[90]">
         <button onClick={() => setIsDevMode(!isDevMode)} className="p-2.5 rounded-full bg-white shadow-2xl transition-all border border-white hover:bg-zinc-50 group flex items-center justify-center">
-          <Terminal size={14} className={isDevMode ? 'text-[#0075de]' : 'text-black'} />
+          <Terminal size={14} className={isDevMode ? 'text-kyma-primary' : 'text-black'} />
         </button>
       </div>
 

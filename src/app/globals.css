@@ -1,15 +1,37 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Kyma Custom Variables */
+  --color-kyma-primary: var(--kyma-primary);
+  --color-kyma-bg: var(--kyma-bg);
+  --color-kyma-text: var(--kyma-text);
+  --color-kyma-panel: var(--kyma-panel);
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  
+  /* Default (Dark Mode) */
+  --kyma-primary: #0075de;
+  --kyma-bg: #0f0f0f;
+  --kyma-text: #f6f5f4;
+  --kyma-panel: #181818;
+  --kyma-glow: #0075de;
+}
+
+:root.light {
+  /* Light Mode */
+  --kyma-primary: #f17c78;
+  --kyma-bg: #fff8ef;
+  --kyma-text: #2e333d;
+  --kyma-panel: #ffffff;
+  --kyma-glow: #fbd3cc;
 }
 
 @media (prefers-color-scheme: dark) {

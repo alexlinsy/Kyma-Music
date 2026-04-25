@@ -60,10 +60,10 @@ export default function RoutineSettings({ isOpen, onClose }: RoutineSettingsProp
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-xl bg-[#181818] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-xl bg-kyma-panel border border-kyma-text/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden max-h-[80vh] flex flex-col text-kyma-text">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#0075de]/10 rounded-xl text-[#0075de]"><Clock size={20} /></div>
+                <div className="p-2 bg-kyma-primary/10 rounded-xl text-kyma-primary"><Clock size={20} /></div>
                 <h2 className="text-xl font-bold text-white">Daily Routines</h2>
               </div>
               <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={24} /></button>
@@ -74,7 +74,7 @@ export default function RoutineSettings({ isOpen, onClose }: RoutineSettingsProp
                 <div key={i} className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
                   <input type="time" value={r.time} onChange={e => updateRoutine(i, 'time', e.target.value)} className="bg-transparent text-white font-mono text-sm focus:outline-none" />
                   <input type="text" placeholder="Activity" value={r.activity} onChange={e => updateRoutine(i, 'activity', e.target.value)} className="bg-transparent text-white text-sm flex-1 focus:outline-none border-b border-white/10" />
-                  <input type="text" placeholder="Music Style" value={r.musicStyle} onChange={e => updateRoutine(i, 'musicStyle', e.target.value)} className="bg-transparent text-[#0075de] text-sm flex-1 focus:outline-none border-b border-white/10" />
+                  <input type="text" placeholder="Music Style" value={r.musicStyle} onChange={e => updateRoutine(i, 'musicStyle', e.target.value)} className="bg-transparent text-kyma-primary text-sm flex-1 focus:outline-none border-b border-kyma-text/10" />
                   <button onClick={() => removeRoutine(i)} className="text-zinc-600 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
                 </div>
               ))}
@@ -84,7 +84,7 @@ export default function RoutineSettings({ isOpen, onClose }: RoutineSettingsProp
               <button onClick={addRoutine} className="flex-1 py-3 bg-white/5 text-zinc-300 rounded-xl font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2">
                 <Plus size={18} /> Add Time Block
               </button>
-              <button onClick={handleSave} disabled={isSaving} className="flex-[2] py-3 bg-[#0075de] text-white rounded-xl font-bold hover:bg-[#005bab] transition-all flex items-center justify-center gap-2">
+              <button onClick={handleSave} disabled={isSaving} className="flex-[2] py-3 bg-kyma-primary text-white rounded-xl font-bold hover:brightness-90 transition-all flex items-center justify-center gap-2">
                 {isSaving ? 'Saving...' : <><Save size={18} /> Save Routine</>}
               </button>
             </div>

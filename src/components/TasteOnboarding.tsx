@@ -62,15 +62,15 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg bg-[#181818] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+            className="relative w-full max-w-lg bg-kyma-panel border border-kyma-text/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden text-kyma-text"
           >
             {/* Background Glow */}
-            <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#0075de]/10 blur-[80px] rounded-full pointer-events-none" />
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-kyma-primary/10 blur-[80px] rounded-full pointer-events-none" />
             
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#0075de]/10 rounded-xl">
-                  <Sparkles size={20} className="text-[#0075de]" />
+                <div className="p-2 bg-kyma-primary/10 rounded-xl">
+                  <Sparkles size={20} className="text-kyma-primary" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-tight">Tune Your Brain</h2>
@@ -86,28 +86,28 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
               {/* Liked Genres */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-xs font-bold text-zinc-400 uppercase tracking-widest ml-1">
-                  <Music size={14} className="text-[#0075de]" />
+                  <Music size={14} className="text-kyma-primary" />
                   Favorite Genres
                 </label>
                 <textarea 
                   value={likedGenres}
                   onChange={(e) => setLikedGenres(e.target.value)}
                   placeholder="Jazz, Alternative, Techno, 80's City Pop..."
-                  className="w-full bg-white/5 border border-white/5 rounded-2xl p-4 text-sm text-zinc-200 focus:outline-none focus:border-[#0075de]/50 transition-all min-h-[80px] resize-none"
+                  className="w-full bg-kyma-text/5 border border-kyma-text/5 rounded-2xl p-4 text-sm text-kyma-text focus:outline-none focus:border-kyma-primary/50 transition-all min-h-[80px] resize-none"
                 />
               </div>
 
               {/* Liked Artists */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-xs font-bold text-zinc-400 uppercase tracking-widest ml-1">
-                  <User size={14} className="text-[#0075de]" />
+                  <User size={14} className="text-kyma-primary" />
                   Key Artists
                 </label>
                 <textarea 
                   value={likedArtists}
                   onChange={(e) => setLikedArtists(e.target.value)}
                   placeholder="Daft Punk, Miles Davis, FKJ..."
-                  className="w-full bg-white/5 border border-white/5 rounded-2xl p-4 text-sm text-zinc-200 focus:outline-none focus:border-[#0075de]/50 transition-all min-h-[80px] resize-none"
+                  className="w-full bg-kyma-text/5 border border-kyma-text/5 rounded-2xl p-4 text-sm text-kyma-text focus:outline-none focus:border-kyma-primary/50 transition-all min-h-[80px] resize-none"
                 />
               </div>
 
@@ -130,7 +130,7 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
             <button 
               onClick={handleSave}
               disabled={isSaving}
-              className="w-full mt-10 py-4 bg-[#0075de] text-white rounded-2xl font-bold shadow-lg shadow-[#0075de]/20 hover:bg-[#005bab] transition-all active:scale-[0.98] disabled:opacity-50"
+              className="w-full mt-10 py-4 bg-kyma-primary text-white rounded-2xl font-bold shadow-lg shadow-kyma-primary/20 hover:brightness-90 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {isSaving ? 'Updating Brain...' : 'Save & Start Listening'}
             </button>

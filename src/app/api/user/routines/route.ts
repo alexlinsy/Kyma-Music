@@ -25,6 +25,9 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    if (!fs.existsSync(USER_DIR)) {
+      fs.mkdirSync(USER_DIR, { recursive: true });
+    }
     fs.writeFileSync(ROUTINE_PATH, JSON.stringify(body, null, 2));
     return NextResponse.json({ success: true });
   } catch (error) {

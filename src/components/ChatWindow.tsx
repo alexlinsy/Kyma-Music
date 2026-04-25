@@ -58,11 +58,11 @@ export default function ChatWindow({ onResponse }: ChatWindowProps) {
   };
 
   return (
-    <div className="flex flex-col h-[450px] w-full bg-[#181818] border border-white/5 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+    <div className="flex flex-col h-[450px] w-full bg-kyma-panel border border-kyma-primary/20 rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-colors duration-500">
       {/* Header - Notion Style */}
-      <div className="px-4 py-3 border-b border-white/5 bg-[#1e1e1e]">
-        <h3 className="text-zinc-200 text-sm font-semibold flex items-center gap-2 tracking-tight">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#0075de]" />
+      <div className="px-4 py-3 border-b border-kyma-text/5 bg-kyma-text/5 transition-colors duration-500">
+        <h3 className="text-kyma-text/90 text-sm font-semibold flex items-center gap-2 tracking-tight">
+          <div className="w-1.5 h-1.5 rounded-full bg-kyma-primary" />
           Kyma DJ Chat
         </h3>
       </div>
@@ -73,8 +73,8 @@ export default function ChatWindow({ onResponse }: ChatWindowProps) {
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] px-4 py-2.5 text-sm leading-relaxed ${
               msg.role === 'user' 
-                ? 'bg-[#0075de] text-white rounded-2xl rounded-tr-none' 
-                : 'bg-[#252525] text-zinc-200 border border-white/5 rounded-2xl rounded-tl-none'
+                ? 'bg-kyma-primary text-white rounded-2xl rounded-tr-none' 
+                : 'bg-kyma-bg text-kyma-text border border-kyma-text/5 rounded-2xl rounded-tl-none'
             }`}>
               {msg.content}
             </div>
@@ -90,7 +90,7 @@ export default function ChatWindow({ onResponse }: ChatWindowProps) {
       </div>
 
       {/* Input - Notion Pill Style */}
-      <div className="p-4 bg-[#1e1e1e]">
+      <div className="p-4 bg-kyma-text/5 transition-colors duration-500">
         <div className="relative group">
           <input
             type="text"
@@ -98,12 +98,12 @@ export default function ChatWindow({ onResponse }: ChatWindowProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Talk to Kyma..."
-            className="w-full bg-[#252525] text-zinc-100 text-sm rounded-lg py-2.5 px-4 pr-10 focus:outline-none border border-white/10 focus:border-[#0075de]/50 transition-all placeholder:text-zinc-600"
+            className="w-full bg-kyma-bg text-kyma-text text-sm rounded-lg py-2.5 px-4 pr-10 focus:outline-none border border-kyma-text/10 focus:border-kyma-primary/50 transition-all placeholder:text-zinc-600"
           />
           <button 
             onClick={handleSend}
             disabled={isLoading}
-            className="absolute right-2 top-1.5 p-1 text-[#0075de] hover:text-[#62aef0] transition-colors disabled:opacity-30"
+            className="absolute right-2 top-1.5 p-1 text-kyma-primary hover:brightness-125 transition-colors disabled:opacity-30"
           >
             <Send size={18} />
           </button>

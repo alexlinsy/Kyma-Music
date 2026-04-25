@@ -11,28 +11,34 @@ export interface UserContext {
 }
 
 export async function getContext(): Promise<UserContext> {
+  const safeReadFile = (p: string) => fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : "";
+  const safeReadJson = (p: string, def: any) => {
+    try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf-8')) : def; }
+    catch { return def; }
+  };
+
   let taste = "";
   const prefPath = path.join(USER_DIR, 'preferences.json');
   if (fs.existsSync(prefPath)) {
-    const prefs = JSON.parse(fs.readFileSync(prefPath, 'utf-8'));
+    const prefs = safeReadJson(prefPath, {});
     taste = `Liked Genres: ${prefs.likedGenres?.join(', ') || 'Not set'}
 Liked Artists: ${prefs.likedArtists?.join(', ') || 'Not set'}
 Disliked Genres: ${prefs.dislikedGenres?.join(', ') || 'None'}`;
   } else {
-    taste = fs.readFileSync(path.join(USER_DIR, 'taste.md'), 'utf-8');
+    taste = safeReadFile(path.join(USER_DIR, 'taste.md')) || "No taste preference found.";
   }
 
   let routines = "";
   const routineJsonPath = path.join(USER_DIR, 'routines.json');
   if (fs.existsSync(routineJsonPath)) {
-    const data = JSON.parse(fs.readFileSync(routineJsonPath, 'utf-8'));
+    const data = safeReadJson(routineJsonPath, {});
     routines = data.routines?.map((r: any) => `- ${r.time}: ${r.activity} (Music: ${r.musicStyle})`).join('\n') || "None set";
   } else {
-    routines = fs.readFileSync(path.join(USER_DIR, 'routines.md'), 'utf-8');
+    routines = safeReadFile(path.join(USER_DIR, 'routines.md')) || "No routines set.";
   }
 
-  const moodRules = fs.readFileSync(path.join(USER_DIR, 'mood-rules.md'), 'utf-8');
-  const playlists = JSON.parse(fs.readFileSync(path.join(USER_DIR, 'playlists.json'), 'utf-8'));
+  const moodRules = safeReadFile(path.join(USER_DIR, 'mood-rules.md')) || "No mood rules set.";
+  const playlists = safeReadJson(path.join(USER_DIR, 'playlists.json'), []);
 
   return { taste, routines, moodRules, playlists };
 }

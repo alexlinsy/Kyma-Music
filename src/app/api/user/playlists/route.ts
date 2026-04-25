@@ -7,8 +7,11 @@ export async function POST(req: Request) {
     const { playlists } = await req.json();
     console.log(`[API] Syncing ${playlists?.length} playlists`);
     
-    // Using explicit absolute path to avoid ambiguity with process.cwd()
-    const PLAYLIST_PATH = '/Users/shaoyilin/kyma/user/playlists.json';
+    const USER_DIR = path.resolve(process.cwd(), '../user');
+    const PLAYLIST_PATH = path.join(USER_DIR, 'playlists.json');
+    if (!fs.existsSync(USER_DIR)) {
+      fs.mkdirSync(USER_DIR, { recursive: true });
+    }
     
     const data = {
       version: "1.0",

@@ -20,6 +20,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const { content } = await req.json();
+    if (!fs.existsSync(USER_DIR)) {
+      fs.mkdirSync(USER_DIR, { recursive: true });
+    }
     fs.writeFileSync(MOOD_RULES_PATH, content, 'utf-8');
     return NextResponse.json({ message: 'Mood rules saved' });
   } catch (error) {

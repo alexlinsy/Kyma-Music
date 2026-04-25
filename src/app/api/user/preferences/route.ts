@@ -46,6 +46,9 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString()
     };
 
+    if (!fs.existsSync(USER_DIR)) {
+      fs.mkdirSync(USER_DIR, { recursive: true });
+    }
     fs.writeFileSync(PREF_PATH, JSON.stringify(prefs, null, 2));
     return NextResponse.json({ success: true });
   } catch (error) {
