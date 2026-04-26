@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import querystring from 'querystring';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const force = searchParams.get('force') === 'true'; // Switch Account mode
+
   const scope = 'user-read-private user-read-email streaming user-read-playback-state user-modify-playback-state user-library-read playlist-read-private playlist-read-collaborative';
   
   const query = querystring.stringify({
@@ -9,6 +12,7 @@ export async function GET() {
     client_id: process.env.SPOTIFY_CLIENT_ID,
     scope: scope,
     redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+    ...(force ? { show_dialog: 'true' } : {}),
   });
 
   return NextResponse.redirect(`https://accounts.spotify.com/authorize?${query}`);

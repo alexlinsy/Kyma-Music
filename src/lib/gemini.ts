@@ -28,7 +28,9 @@ export async function askGemini(userInput: string, environment: any, type: strin
     CRITICAL: YOU MUST RESPOND IN ENGLISH ONLY. NO CHINESE CHARACTERS ALLOWED IN "speech".
     
     Task: The user's Spotify player just started playing the track: ${userInput}.
-    Provide a very short, punchy, engaging AI DJ commentary (maximum 2 sentences) about this specific track. You can make a joke, mention a fun fact about the artist/song, or tie it into the environment (${environment.time}, ${environment.weather}, or just life context). 
+    Provide a very short, punchy, engaging AI DJ commentary (maximum 2 sentences) about this specific track. 
+    Mix it up: you can make a joke, share a quick fact, or just drop a cool observation about the artist.
+    CRITICAL: Avoid repetitive or cliché phrasing. Do not end your sentences with tag questions like "isn't it?", "won't it?", or "shall we?". Keep it fresh.
     CRITICAL: Keep "tracks" array completely EMPTY. Do not queue any new tracks. Just provide the "speech".
     
     Response:

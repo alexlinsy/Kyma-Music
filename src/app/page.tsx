@@ -52,6 +52,7 @@ export default function Home() {
   const isProcessingNext = useRef<boolean>(false);
   const hasAutoSynced = useRef<boolean>(false);
   const spotifyResetRef = useRef<boolean>(false); // prevents re-reading token after explicit reset
+  const [spotifyReset, setSpotifyReset] = useState(false); // forces provider modal after explicit Reset
   const queueRef = useRef<string[]>([]);
   const trackEndedRef = useRef<() => void>(() => { });
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -113,6 +114,11 @@ export default function Home() {
   // Show the music-provider picker if no service is connected yet.
   // Returns true if a service is already connected, false if we need to wait.
   const requireMusicProvider = (): boolean => {
+    // If the user explicitly reset Spotify, always show the picker (even if token is stale)
+    if (spotifyReset) {
+      setIsProviderModalOpen(true);
+      return false;
+    }
     if (token || neteaseCookie) return true;
     setIsProviderModalOpen(true);
     return false;
@@ -850,10 +856,16 @@ export default function Home() {
         onClose={() => setIsProviderModalOpen(false)}
         onSelectSpotify={() => {
           setIsProviderModalOpen(false);
+          // User is actively re-connecting — clear the reset guard
+          spotifyResetRef.current = false;
+          setSpotifyReset(false);
           window.location.href = '/api/auth/spotify';
         }}
         onSelectNetease={() => {
           setIsProviderModalOpen(false);
+          // Switching to NetEase — clear the Spotify reset guard
+          spotifyResetRef.current = false;
+          setSpotifyReset(false);
           setIsNeteaseModalOpen(true);
         }}
       />
@@ -864,7 +876,7 @@ export default function Home() {
             <p key={tech}>{tech}</p>
           ))}
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3 flex-wrap justify-center">
           {user && (
             <button onClick={async () => {
               const { createClient } = await import('@/lib/supabase/client');
@@ -874,21 +886,35 @@ export default function Home() {
             }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-white transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-white/20">Sign Out</button>
           )}
 
+          {/* Reset Spotify: clears stored token but Spotify may auto-reconnect with cached session */}
           <button
             onClick={() => {
-              // Mark as reset so the token-restore useEffect won't re-read from storage
               spotifyResetRef.current = true;
-              // Clear all Spotify credentials from storage
+              setSpotifyReset(true);
               localStorage.removeItem('spotify_token');
               document.cookie = 'spotify_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-              // Clear in-memory token → requireMusicProvider() will fire on next play/chat
               setToken('');
-              // Disconnect the SDK player gracefully
               if (player) player.disconnect();
               log('Spotify 已断开连接');
             }}
             className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-rose-500 transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-rose-500/20"
           >Reset Spotify</button>
+
+          {/* Switch Account: forces Spotify login screen via show_dialog=true */}
+          {token && (
+            <button
+              onClick={() => {
+                localStorage.removeItem('spotify_token');
+                document.cookie = 'spotify_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                setToken('');
+                if (player) player.disconnect();
+                // Redirect with show_dialog=true to force the Spotify account picker
+                window.location.href = '/api/auth/spotify?force=true';
+              }}
+              className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-kyma-primary transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-kyma-primary/20"
+            >Switch Account</button>
+          )}
+
           {neteaseCookie && (
             <button onClick={() => { localStorage.removeItem('netease_cookie'); setNeteaseCookie(''); setNeteaseTrackState(null); log('网易云已断开连接'); }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-[#e60026] transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-[#e60026]/20">Reset NetEase</button>
           )}
