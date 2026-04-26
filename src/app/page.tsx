@@ -6,9 +6,12 @@ import TasteOnboarding from '@/components/TasteOnboarding';
 import RoutineSettings from '@/components/RoutineSettings';
 import MoodSettings from '@/components/MoodSettings';
 import LoginModal from '@/components/LoginModal';
-import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal, SlidersHorizontal, Sun, Moon, User as UserIcon } from 'lucide-react';
+import NeteaseLoginModal from '@/components/NeteaseLoginModal';
+import MusicProviderModal from '@/components/MusicProviderModal';
+import { Play, SkipForward, SkipBack, Volume2, VolumeX, Radio, Music, Disc, LogIn, Heart, Calendar, RefreshCw, Terminal, SlidersHorizontal, Sun, Moon, User as UserIcon, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpotify } from '@/hooks/useSpotify';
+import { useNeteaseMusic } from '@/hooks/useNetease';
 import { generateSpeech } from '@/lib/tts';
 
 export default function Home() {
@@ -17,7 +20,7 @@ export default function Home() {
   const [volume, setVolume] = useState<number>(0.5);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [preMuteVolume, setPreMuteVolume] = useState<number>(0.5);
-  
+
   const volumeRef = useRef<number>(0.5);
   const isTtsPlaying = useRef<boolean>(false);
   const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -28,6 +31,14 @@ export default function Home() {
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginReason, setLoginReason] = useState<string>('');
+  const [isNeteaseModalOpen, setIsNeteaseModalOpen] = useState(false);
+  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
+  const [neteaseCookie, setNeteaseCookie] = useState<string>('');
+  const [neteaseTrackState, setNeteaseTrackState] = useState<any>(null);
+  const [neteaseIsPlaying, setNeteaseIsPlaying] = useState(false);
+  const [neteasePlayBlocked, setNeteasePlayBlocked] = useState(false);
+  const [neteaseGeoBlocked, setNeteaseGeoBlocked] = useState(false);
+  const neteaseAudioRef = useRef<HTMLAudioElement | null>(null);
   const [user, setUser] = useState<any>(null);
   const [freePlays, setFreePlays] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -48,6 +59,46 @@ export default function Home() {
 
   const { player, isReady, currentTrack, isPlaying, progress, setProgress, deviceId, error: spotifyError, connect } = useSpotify(token, () => trackEndedRef.current());
 
+  // --- NetEase Dual-Core Engine ---
+  const { isPlaying: neteasePlaying, error: neteaseError, playTrack: playNeteaseTrack, getRecommendSongs } = useNeteaseMusic(neteaseCookie, {
+    onTrackChange: (track, url) => {
+      setNeteaseTrackState(track);
+      setNeteaseGeoBlocked(false);
+      if (!neteaseAudioRef.current) neteaseAudioRef.current = new Audio();
+      const audio = neteaseAudioRef.current;
+      console.log('[Kyma NetEase] onTrackChange url:', url);
+      if (url) {
+        audio.src = url;
+        audio.volume = volumeRef.current;
+        audio.currentTime = 0;
+        audio.onended = () => trackEndedRef.current();
+        audio.onplay = () => { setNeteaseIsPlaying(true); setNeteasePlayBlocked(false); };
+        audio.onpause = () => setNeteaseIsPlaying(false);
+        audio.play()
+          .then(() => { setNeteasePlayBlocked(false); })
+          .catch(err => {
+            console.warn('[Kyma NetEase] play() blocked:', err.name, err.message);
+            if (err.name === 'NotAllowedError') {
+              setNeteasePlayBlocked(true);
+            }
+          });
+      } else {
+        // No stream URL — almost certainly a geo-restriction outside mainland China
+        console.warn('[Kyma NetEase] No stream URL (geo-restricted or premium-only)');
+        setNeteaseGeoBlocked(true);
+        // Auto-skip to next track after 6 seconds
+        setTimeout(() => {
+          setNeteaseGeoBlocked(false);
+          trackEndedRef.current();
+        }, 6000);
+      }
+    }
+  });
+
+  const isNeteaseMode = !!neteaseCookie;
+  const effectiveTrack = isNeteaseMode ? neteaseTrackState : currentTrack;
+  const effectiveIsPlaying = isNeteaseMode ? neteaseIsPlaying : isPlaying;
+
   const log = useCallback((msg: string) => {
     setDebugLog(prev => {
       if (prev[0] === msg) return prev;
@@ -58,12 +109,17 @@ export default function Home() {
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Show the music-provider picker if no service is connected yet.
+  // Returns true if a service is already connected, false if we need to wait.
+  const requireMusicProvider = (): boolean => {
+    if (token || neteaseCookie) return true;
+    setIsProviderModalOpen(true);
+    return false;
+  };
+
   const checkAILimit = (): boolean => {
-    if (!token) {
-      window.location.href = '/api/auth/spotify';
-      return false;
-    }
-    
+    if (!requireMusicProvider()) return false;
+
     if (user) return true; // unlimited
     if (freePlays >= 5) {
       setLoginReason("You've reached your 5 free AI interactions. Log in to unlock unlimited AI DJ access!");
@@ -178,29 +234,50 @@ export default function Home() {
   }, [log]);
 
   const playTrackAction = useCallback(async (trackName: string) => {
-    if (!token || !deviceId) return false;
+    if (!token && !neteaseCookie) return false;
     try {
       log(`Searching: ${trackName}`);
-      const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(trackName)}&type=track&limit=1`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const searchData = await searchRes.json();
-      const trackUri = searchData.tracks?.items[0]?.uri;
-      if (trackUri) {
-        log(`Playing: ${trackName}`);
-        await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
-          method: 'PUT',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uris: [trackUri], position_ms: 0 })
+      if (neteaseCookie) {
+        // NetEase search + play
+        const res = await fetch('/api/netease', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'search', params: { keyword: trackName, limit: 1 }, cookie: neteaseCookie })
         });
-        return true;
+        const data = await res.json();
+        const rawTrack = data.result?.songs?.[0];
+        if (rawTrack) {
+          log(`Playing (NetEase): ${rawTrack.name}`);
+          await playNeteaseTrack({
+            id: rawTrack.id, name: rawTrack.name,
+            artists: rawTrack.artists || [], album: rawTrack.album || { name: '', picUrl: '' },
+            duration: rawTrack.duration || 0,
+          });
+          return true;
+        }
+      } else if (token && deviceId) {
+        // Spotify search + play
+        const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(trackName)}&type=track&limit=1`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const searchData = await searchRes.json();
+        const trackUri = searchData.tracks?.items[0]?.uri;
+        if (trackUri) {
+          log(`Playing (Spotify): ${trackName}`);
+          await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uris: [trackUri], position_ms: 0 })
+          });
+          return true;
+        }
       }
       return false;
     } catch (err: any) { log(`Play error: ${err.message}`); return false; }
-  }, [token, deviceId, log]);
+  }, [token, deviceId, log, neteaseCookie, playNeteaseTrack]);
 
   const moveToNext = useCallback(async () => {
-    if (isProcessingNext.current || !token || !deviceId) return;
+    if (isProcessingNext.current || (!token && !neteaseCookie)) return;
     isProcessingNext.current = true;
     try {
       const currentQueue = queueRef.current;
@@ -224,16 +301,17 @@ export default function Home() {
         }
       }
     } finally { isProcessingNext.current = false; }
-  }, [token, deviceId, playTrackAction, speak, log]);
+  }, [token, neteaseCookie, playTrackAction, speak, log]);
 
   const handleAiResponse = useCallback(async (speech: string, tracks: string[]) => {
     setDjScript(speech);
     speak(speech);
     if (tracks?.length > 0) {
       setTrackQueue(tracks);
-      if (token && deviceId) await playTrackAction(tracks[0]);
+      // Play first track regardless of which engine is active
+      await playTrackAction(tracks[0]);
     }
-  }, [speak, token, deviceId, playTrackAction]);
+  }, [speak, playTrackAction]);
 
   useEffect(() => {
     trackEndedRef.current = () => {
@@ -266,9 +344,13 @@ export default function Home() {
       setUser(data?.user || null);
     };
     fetchUser();
-    
+
     const val = localStorage.getItem('kyma_ai_uses');
     if (val) setFreePlays(parseInt(val, 10));
+
+    // Restore NetEase cookie after client mount (avoids SSR hydration mismatch)
+    const savedNeteaseCookie = localStorage.getItem('netease_cookie');
+    if (savedNeteaseCookie) setNeteaseCookie(savedNeteaseCookie);
 
     const fetchPrefs = async () => {
       try {
@@ -289,51 +371,51 @@ export default function Home() {
 
   useEffect(() => {
     if (currentTrack?.name) {
-       if (!trackHistoryRef.current.includes(currentTrack.name)) {
-          trackHistoryRef.current.push(currentTrack.name);
-          if (trackHistoryRef.current.length > 50) trackHistoryRef.current.shift();
-       }
+      if (!trackHistoryRef.current.includes(currentTrack.name)) {
+        trackHistoryRef.current.push(currentTrack.name);
+        if (trackHistoryRef.current.length > 50) trackHistoryRef.current.shift();
+      }
     }
   }, [currentTrack?.name]);
 
   useEffect(() => {
     if (currentTrack?.id && isReady) {
-       if (lastAnnouncedTrackRef.current === currentTrack.id) return;
-       lastAnnouncedTrackRef.current = currentTrack.id;
+      if (lastAnnouncedTrackRef.current === currentTrack.id) return;
+      lastAnnouncedTrackRef.current = currentTrack.id;
 
-       const announce = async () => {
-          log(`Requesting DJ intro for ${currentTrack.name}`);
-          
-          if (!checkAILimit()) {
-             log("AI Limit reached. Pausing music and showing modal.");
-             if (player) player.pause();
-             return;
-          }
+      const announce = async () => {
+        log(`Requesting DJ intro for ${currentTrack.name}`);
 
-          try {
-             const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                   type: 'intro', 
-                   track: currentTrack,
-                   history: trackHistoryRef.current,
-                   localTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-                })
-             });
-             const data = await res.json();
-             if (data.speech) {
-                setDjScript(data.speech);
-                speak(data.speech);
-             }
-          } catch(e) {
-             log(`DJ Intro error: ${e}`);
+        if (!checkAILimit()) {
+          log("AI Limit reached. Pausing music and showing modal.");
+          if (player) player.pause();
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'intro',
+              track: currentTrack,
+              history: trackHistoryRef.current,
+              localTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+            })
+          });
+          const data = await res.json();
+          if (data.speech) {
+            setDjScript(data.speech);
+            speak(data.speech);
           }
-       };
-       
-       // Wait slightly before announcing to let the user hear the track intro
-       const timer = setTimeout(announce, 2000);
-       return () => clearTimeout(timer);
+        } catch (e) {
+          log(`DJ Intro error: ${e}`);
+        }
+      };
+
+      // Wait slightly before announcing to let the user hear the track intro
+      const timer = setTimeout(announce, 2000);
+      return () => clearTimeout(timer);
     }
   }, [currentTrack?.id, isReady, log, speak]); // Use empty array to avoid HMR size change errors during development
 
@@ -347,38 +429,82 @@ export default function Home() {
   }, [player, isReady, connect]);
 
   const applyVolumeGradually = useCallback((targetRaw: number, duration: number = 800) => {
-    if (!player) return;
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
-    
+
+    // NetEase mode: fade the HTML Audio element directly
+    if (neteaseAudioRef.current && !player) {
+      const audio = neteaseAudioRef.current;
+      const startVol = audio.volume;
+      const steps = 15;
+      const stepRate = duration / steps;
+      const delta = (targetRaw - startVol) / steps;
+      let stepCount = 0;
+      fadeIntervalRef.current = setInterval(() => {
+        stepCount++;
+        audio.volume = Math.max(0, Math.min(1, audio.volume + delta));
+        if (stepCount >= steps) {
+          audio.volume = targetRaw;
+          if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        }
+      }, stepRate);
+      return;
+    }
+
+    if (!player) return;
+
     player.getVolume().then((currVol: number) => {
-        const steps = 15;
-        const stepRate = duration / steps;
-        const delta = (targetRaw - currVol) / steps;
-        
-        let stepCount = 0;
-        fadeIntervalRef.current = setInterval(() => {
-            stepCount++;
-            currVol += delta;
-            if (stepCount >= steps) {
-                currVol = targetRaw;
-                if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
-            }
-            player.setVolume(Math.max(0, Math.min(1, currVol))).catch(() => {});
-        }, stepRate);
+      const steps = 15;
+      const stepRate = duration / steps;
+      const delta = (targetRaw - currVol) / steps;
+
+      let stepCount = 0;
+      fadeIntervalRef.current = setInterval(() => {
+        stepCount++;
+        currVol += delta;
+        if (stepCount >= steps) {
+          currVol = targetRaw;
+          if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+        }
+        const v = Math.max(0, Math.min(1, currVol));
+        player.setVolume(v).catch(() => {
+          if (token) {
+            fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${Math.round(v * 100)}`, {
+              method: 'PUT', headers: { 'Authorization': `Bearer ${token}` },
+            }).catch(() => {});
+          }
+        });
+      }, stepRate);
     }).catch(() => {
-        player.setVolume(targetRaw);
+      player.setVolume(targetRaw).catch(() => {});
     });
-  }, [player]);
+  }, [player, token]);
 
   const handleVolumeChange = useCallback((newVolume: number) => {
     setVolume(newVolume);
     volumeRef.current = newVolume;
     if (newVolume > 0) setIsMuted(false);
-    
+
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
     const effectiveVolume = isTtsPlaying.current ? newVolume * 0.15 : newVolume;
-    if (player) player.setVolume(effectiveVolume).catch((err: any) => log(`Vol err: ${err.message}`));
-  }, [player, log]);
+
+    // NetEase: directly set HTML Audio element volume
+    if (neteaseAudioRef.current) {
+      neteaseAudioRef.current.volume = effectiveVolume;
+    }
+
+    // Spotify SDK volume
+    if (player) {
+      player.setVolume(effectiveVolume).catch(() => {
+        // SDK setVolume failed (common in production) — fall back to REST API
+        if (token) {
+          fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${Math.round(effectiveVolume * 100)}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}` },
+          }).catch((err: any) => log(`Vol REST err: ${err.message}`));
+        }
+      });
+    }
+  }, [player, token, log]);
 
   const toggleMute = useCallback(() => {
     if (isMuted) { handleVolumeChange(preMuteVolume || 0.5); setIsMuted(false); }
@@ -388,27 +514,27 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!audioRef.current) audioRef.current = new Audio();
-    
+
     const onPlay = () => {
-        isTtsPlaying.current = true;
-        applyVolumeGradually(volumeRef.current * 0.15, 800);
+      isTtsPlaying.current = true;
+      applyVolumeGradually(volumeRef.current * 0.15, 800);
     };
-    
+
     const onRestore = () => {
-        if (!isTtsPlaying.current) return;
-        isTtsPlaying.current = false;
-        applyVolumeGradually(volumeRef.current, 2000);
+      if (!isTtsPlaying.current) return;
+      isTtsPlaying.current = false;
+      applyVolumeGradually(volumeRef.current, 2000);
     };
 
     const audio = audioRef.current;
     audio.addEventListener('play', onPlay);
     audio.addEventListener('ended', onRestore);
     audio.addEventListener('pause', onRestore);
-    
+
     return () => {
-        audio.removeEventListener('play', onPlay);
-        audio.removeEventListener('ended', onRestore);
-        audio.removeEventListener('pause', onRestore);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('ended', onRestore);
+      audio.removeEventListener('pause', onRestore);
     };
   }, [applyVolumeGradually]);
 
@@ -428,6 +554,25 @@ export default function Home() {
   }, [syncPlaylists, token]);
 
   const togglePlay = async () => {
+    if (!requireMusicProvider()) return;
+    if (isNeteaseMode) {
+      const audio = neteaseAudioRef.current;
+      if (audio && neteaseTrackState && audio.src) {
+        // Track already loaded — this IS a user gesture, play() will work
+        if (neteaseIsPlaying) {
+          audio.pause();
+        } else {
+          audio.play()
+            .then(() => setNeteasePlayBlocked(false))
+            .catch(err => console.warn('[Kyma] Netease play err:', err));
+        }
+      } else {
+        // No track yet — ask AI. Note: play() after async may be blocked by
+        // autoplay policy; if so, neteasePlayBlocked will show a tap-to-play btn.
+        moveToNext();
+      }
+      return;
+    }
     if (!token) { window.location.href = '/api/auth/spotify'; return; }
     if (player) { if (!isReady) connect(); player.togglePlay(); }
   };
@@ -446,10 +591,10 @@ export default function Home() {
       {/* Dynamic Ambient Album Background */}
       <div className="absolute inset-0 pointer-events-none z-[-1]">
         <AnimatePresence>
-          {isPlaying && currentTrack?.album?.images?.[0]?.url && (
+          {effectiveIsPlaying && (effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl) && (
             <motion.img
-              key={currentTrack.album.images[0].url}
-              src={currentTrack.album.images[0].url}
+              key={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
+              src={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
               initial={{ opacity: 0, scale: 1.2 }}
               animate={{ opacity: isLightMode ? 0.45 : 0.35, scale: 1.5 }}
               exit={{ opacity: 0 }}
@@ -471,16 +616,16 @@ export default function Home() {
           <button onClick={() => setIsLightMode(!isLightMode)} className="text-kyma-text/50 hover:text-kyma-text transition-colors" title="Toggle Light/Dark Mode">
             {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
           </button>
-          
+
           {user ? (
             <div className="flex items-center gap-1.5 ml-2 pl-4 border-l border-kyma-text/10 cursor-pointer" title={user.email}>
-               <div className="w-6 h-6 rounded-full bg-kyma-primary/20 border border-kyma-primary/40 flex items-center justify-center">
-                  <UserIcon size={12} className="text-kyma-primary" />
-               </div>
+              <div className="w-6 h-6 rounded-full bg-kyma-primary/20 border border-kyma-primary/40 flex items-center justify-center">
+                <UserIcon size={12} className="text-kyma-primary" />
+              </div>
             </div>
           ) : (
             <button onClick={() => { setLoginReason(""); setIsLoginModalOpen(true); }} className="ml-2 pl-4 border-l border-kyma-text/10 text-[10px] font-bold uppercase tracking-wider text-kyma-text/70 hover:text-kyma-primary transition-colors flex items-center gap-1.5">
-               <UserIcon size={12} /> <span className="hidden md:inline">Log In / Sign Up</span>
+              <UserIcon size={12} /> <span className="hidden md:inline">Log In / Sign Up</span>
             </button>
           )}
         </div>
@@ -535,11 +680,66 @@ export default function Home() {
 
           <div className="relative flex flex-col items-center justify-center py-4">
             <div className="relative w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 flex items-center justify-center mx-auto">
+              {spotifyError && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md rounded-full border border-rose-500/30 overflow-hidden">
+                  <div className="text-center p-6 flex flex-col items-center w-full">
+                    <div className="w-12 h-12 bg-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mb-4">
+                      <AlertCircle size={24} />
+                    </div>
+                    <span className="text-rose-400 font-bold text-[11px] tracking-widest uppercase mb-2">Playback Initialization Failed</span>
+                    <span className="text-zinc-400 text-[9px] uppercase tracking-wider max-w-[80%] leading-relaxed text-center font-medium">
+                      {spotifyError.includes('Premium') ? 'Spotify Premium subscription is strictly required to use the Web Playback SDK in browsers.' : spotifyError}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* NetEase: browser autoplay blocked — needs direct user gesture */}
+              {neteasePlayBlocked && neteaseTrackState && (
+                <button
+                  onClick={() => {
+                    const audio = neteaseAudioRef.current;
+                    if (audio) audio.play().then(() => setNeteasePlayBlocked(false)).catch(() => {});
+                  }}
+                  className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md rounded-full border border-kyma-primary/30 overflow-hidden group cursor-pointer"
+                >
+                  <div className="text-center flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 bg-kyma-primary/20 border border-kyma-primary/40 rounded-full flex items-center justify-center group-hover:bg-kyma-primary/30 transition-colors">
+                      <Play size={28} fill="currentColor" className="text-kyma-primary ml-1" />
+                    </div>
+                    <span className="text-kyma-text/70 text-[10px] uppercase tracking-widest font-bold">Tap to Play</span>
+                  </div>
+                </button>
+              )}
+
+              {/* NetEase: geo-restricted track — show friendly message + auto-skip */}
+              {neteaseGeoBlocked && neteaseTrackState && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-md rounded-full border border-amber-500/25 overflow-hidden">
+                  <div className="text-center flex flex-col items-center gap-3 px-8">
+                    <div className="w-12 h-12 bg-amber-500/20 border border-amber-500/30 rounded-full flex items-center justify-center">
+                      {/* Globe icon */}
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-amber-400">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-amber-400 font-bold text-[10px] tracking-widest uppercase mb-1.5">地区限制 · Region Locked</p>
+                      <p className="text-zinc-400 text-[9px] leading-relaxed max-w-[160px] mx-auto">
+                        此歌曲在中国大陆以外无法播放<br />
+                        <span className="text-zinc-500">This track is unavailable outside mainland China due to licensing.</span>
+                      </p>
+                    </div>
+                    <p className="text-zinc-600 text-[9px] tracking-wider">Skipping in 6s...</p>
+                  </div>
+                </div>
+              )}
+
               <svg ref={svgRef} onClick={handleSeek} className="absolute inset-0 w-full h-full -rotate-90 overflow-visible z-30 cursor-pointer outline-none" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="45.5" fill="none" stroke="transparent" strokeWidth="8" />
                 <motion.circle cx="50" cy="50" r="45.5" fill="none" stroke="var(--kyma-primary)" strokeWidth="0.8" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: progressPercent / 100 }} style={{ filter: `drop-shadow(0 0 3px var(--kyma-glow))` }} transition={{ type: "tween", ease: "linear", duration: 1 }} />
               </svg>
-              
+
               {/* Outer Shadow Container */}
               <div className="absolute w-[90%] h-[90%] rounded-full shadow-2xl pointer-events-none z-0" />
 
@@ -548,9 +748,9 @@ export default function Home() {
                 style={{ WebkitMaskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)', maskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)' }}
               >
                 <AnimatePresence mode="wait">
-                  <motion.div key={currentTrack?.id || 'empty'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="w-full h-full rounded-full overflow-hidden relative group">
-                    {currentTrack?.album?.images?.[0]?.url ? (
-                      <img src={currentTrack.album.images[0].url} alt={currentTrack.name} className={`w-full h-full object-cover transition-transform duration-700 ${isPlaying ? 'animate-[spin_40s_linear_infinite]' : 'scale-95 opacity-80'}`} />
+                  <motion.div key={effectiveTrack?.id || 'empty'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="w-full h-full rounded-full overflow-hidden relative group">
+                    {(effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl) ? (
+                      <img src={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl} alt={effectiveTrack?.name} className={`w-full h-full object-cover transition-transform duration-700 ${effectiveIsPlaying ? 'animate-[spin_40s_linear_infinite]' : 'scale-95 opacity-80'}`} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-kyma-primary/10 transition-colors duration-500"><Music size={40} className="text-kyma-primary/60" /></div>
                     )}
@@ -566,18 +766,18 @@ export default function Home() {
             </div>
 
             <div className="mt-10 text-center space-y-2">
-              <motion.h2 key={currentTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xl md:text-2xl font-bold tracking-tight text-kyma-primary line-clamp-1 px-4">{currentTrack ? currentTrack.name : 'Ready to Broadcast'}</motion.h2>
+              <motion.h2 key={effectiveTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xl md:text-2xl font-bold tracking-tight text-kyma-primary line-clamp-1 px-4">{effectiveTrack ? effectiveTrack.name : 'Ready to Broadcast'}</motion.h2>
               <div className="flex flex-col items-center">
-                <motion.p key={currentTrack?.artists?.[0]?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[#a39e98] text-sm font-medium tracking-wide uppercase">{currentTrack ? currentTrack.artists.map((a: any) => a.name).join(', ') : 'Kyma Music'}</motion.p>
-                <span className="text-[10px] font-mono text-zinc-600 tabular-nums font-bold mt-1.5 opacity-80">{formatTime(progress.position)} / {formatTime(progress.duration)}</span>
+                <motion.p key={effectiveTrack?.artists?.[0]?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[#a39e98] text-sm font-medium tracking-wide uppercase">{effectiveTrack ? effectiveTrack.artists.map((a: any) => a.name).join(', ') : 'Kyma Music'}</motion.p>
+                <span className="text-[10px] font-mono text-zinc-600 tabular-nums font-bold mt-1.5 opacity-80">{formatTime(isNeteaseMode ? (neteaseAudioRef.current ? neteaseAudioRef.current.currentTime * 1000 : 0) : progress.position)} / {formatTime(isNeteaseMode ? (effectiveTrack?.duration || 0) : progress.duration)}</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-10 md:gap-14 py-4">
-            <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={() => player?.previousTrack()}><SkipBack size={32} /></button>
+            <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={() => isNeteaseMode ? null : player?.previousTrack()}><SkipBack size={32} /></button>
             <button onClick={togglePlay} className="w-20 h-20 bg-kyma-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-kyma-primary/40">
-              {isPlaying ? <div className="w-6 h-6 bg-white rounded-sm" /> : <Play size={36} fill="white" className="ml-1.5" />}
+              {effectiveIsPlaying ? <div className="w-6 h-6 bg-white rounded-sm" /> : <Play size={36} fill="white" className="ml-1.5" />}
             </button>
             <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={manualSkip}><SkipForward size={32} /></button>
           </div>
@@ -609,6 +809,27 @@ export default function Home() {
       <RoutineSettings isOpen={isRoutineModalOpen} onClose={() => setIsRoutineModalOpen(false)} />
       <MoodSettings isOpen={isMoodModalOpen} onClose={() => setIsMoodModalOpen(false)} />
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} reason={loginReason} />
+      <NeteaseLoginModal
+        isOpen={isNeteaseModalOpen}
+        onClose={() => setIsNeteaseModalOpen(false)}
+        onLoginSuccess={(cookie, uid) => {
+          setNeteaseCookie(cookie);
+          localStorage.setItem('netease_cookie', cookie);
+          log('网易云音乐连接成功！');
+        }}
+      />
+      <MusicProviderModal
+        isOpen={isProviderModalOpen}
+        onClose={() => setIsProviderModalOpen(false)}
+        onSelectSpotify={() => {
+          setIsProviderModalOpen(false);
+          window.location.href = '/api/auth/spotify';
+        }}
+        onSelectNetease={() => {
+          setIsProviderModalOpen(false);
+          setIsNeteaseModalOpen(true);
+        }}
+      />
 
       <footer className="mt-8 py-12 border-t border-white/5 text-center flex flex-col items-center gap-6">
         <div className="text-zinc-600 text-[11px] tracking-tight max-w-xs mx-auto leading-relaxed text-center">
@@ -627,6 +848,9 @@ export default function Home() {
           )}
 
           <button onClick={() => { localStorage.removeItem('spotify_token'); document.cookie = "spotify_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"; window.location.reload(); }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-rose-500 transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-rose-500/20">Reset Spotify</button>
+          {neteaseCookie && (
+            <button onClick={() => { localStorage.removeItem('netease_cookie'); setNeteaseCookie(''); setNeteaseTrackState(null); log('网易云已断开连接'); }} className="text-zinc-700 text-[9px] uppercase font-bold tracking-[0.2em] hover:text-[#e60026] transition-colors px-4 py-2 rounded-full border border-zinc-800/50 hover:border-[#e60026]/20">Reset NetEase</button>
+          )}
         </div>
       </footer>
     </main>
