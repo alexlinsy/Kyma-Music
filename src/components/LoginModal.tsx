@@ -50,7 +50,7 @@ export default function LoginModal({ isOpen, onClose, reason }: Props) {
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="bg-[#181818]/60 backdrop-blur-2xl p-10 rounded-3xl border border-white/5 shadow-2xl flex flex-col w-full max-w-[360px] gap-5 relative z-10">
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="bg-[#181818]/60 backdrop-blur-2xl p-8 sm:p-10 rounded-[2rem] max-h-[85vh] overflow-y-auto border border-white/5 shadow-2xl flex flex-col w-[calc(100%-2rem)] sm:w-full max-w-[360px] gap-5 relative z-10 custom-scrollbar">
             <button onClick={onClose} className="absolute top-4 right-4 p-2 text-white/50 hover:text-white transition-colors"><X size={16} /></button>
             
             <div className="text-center mb-2">
