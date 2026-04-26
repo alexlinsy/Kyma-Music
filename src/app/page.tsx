@@ -596,12 +596,6 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="fixed bottom-6 right-6 z-[90]">
-        <button onClick={() => setIsDevMode(!isDevMode)} className="p-2.5 rounded-full bg-white shadow-2xl transition-all border border-white hover:bg-zinc-50 group flex items-center justify-center">
-          <Terminal size={14} className={isDevMode ? 'text-kyma-primary' : 'text-black'} />
-        </button>
-      </div>
-
       <TasteOnboarding isOpen={isTasteModalOpen} onClose={() => setIsTasteModalOpen(false)} initialData={userPrefs} onSave={(data) => { setUserPrefs(data); log("Taste updated."); }} />
       <RoutineSettings isOpen={isRoutineModalOpen} onClose={() => setIsRoutineModalOpen(false)} />
       <MoodSettings isOpen={isMoodModalOpen} onClose={() => setIsMoodModalOpen(false)} />
