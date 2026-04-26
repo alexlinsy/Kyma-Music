@@ -50,6 +50,7 @@ export default function Home() {
   const currentAudioUrl = useRef<string | null>(null);
   const lastSpokenText = useRef<string>("");
   const isProcessingNext = useRef<boolean>(false);
+  const skipNextIntroRef = useRef<boolean>(false); // prevents double intros when AI already introduced the track
   const hasAutoSynced = useRef<boolean>(false);
   const spotifyResetRef = useRef<boolean>(false); // prevents re-reading token after explicit reset
   const [spotifyReset, setSpotifyReset] = useState(false); // forces provider modal after explicit Reset
@@ -303,6 +304,7 @@ export default function Home() {
         setDjScript(data.speech);
         speak(data.speech);
         if (data.tracks?.length > 0) {
+          skipNextIntroRef.current = true; // AI already introduced this queue
           setTrackQueue(data.tracks);
           await playTrackAction(data.tracks[0]);
         }
@@ -314,6 +316,7 @@ export default function Home() {
     setDjScript(speech);
     speak(speech);
     if (tracks?.length > 0) {
+      skipNextIntroRef.current = true; // AI already introduced the track in its response
       setTrackQueue(tracks);
       // Play first track regardless of which engine is active
       await playTrackAction(tracks[0]);
@@ -389,6 +392,12 @@ export default function Home() {
     if (currentTrack?.id && isReady) {
       if (lastAnnouncedTrackRef.current === currentTrack.id) return;
       lastAnnouncedTrackRef.current = currentTrack.id;
+
+      if (skipNextIntroRef.current) {
+        skipNextIntroRef.current = false;
+        log(`Skipping intro for ${currentTrack.name} as it was already introduced.`);
+        return;
+      }
 
       const announce = async () => {
         log(`Requesting DJ intro for ${currentTrack.name}`);

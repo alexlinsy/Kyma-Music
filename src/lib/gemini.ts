@@ -42,6 +42,10 @@ export async function askGemini(userInput: string, environment: any, type: strin
     
     User Input: ${userInput}
     
+    CRITICAL: If you are suggesting tracks in the "tracks" array, your "speech" must combine your general response with a natural introduction to the FIRST track in your list. 
+    Do not just say "Here are some songs"; instead, say something like "Absolutely, let's get into the vibe with [First Track Name] by [Artist]..." 
+    This prevents us from needing a separate introduction for that first song.
+    
     Response:
     `;
 
