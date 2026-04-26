@@ -3,10 +3,10 @@ import { askGemini } from '@/lib/gemini';
 
 export async function POST(req: Request) {
   try {
-    const { message, type, track, history } = await req.json();
+    const { message, type, track, history, localTime } = await req.json();
     
     const environment = {
-      time: new Date().toLocaleTimeString(),
+      time: localTime || new Date().toLocaleTimeString(),
       weather: "Sunny",
       activity: "Relaxing",
       history

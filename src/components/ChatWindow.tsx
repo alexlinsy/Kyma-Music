@@ -41,7 +41,11 @@ export default function ChatWindow({ onResponse, onSendRequest, history = [] }: 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, history })
+        body: JSON.stringify({ 
+          message: userMsg, 
+          history,
+          localTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        })
       });
       const data = await res.json();
       

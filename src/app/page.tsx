@@ -317,7 +317,8 @@ export default function Home() {
                 body: JSON.stringify({ 
                    type: 'intro', 
                    track: currentTrack,
-                   history: trackHistoryRef.current
+                   history: trackHistoryRef.current,
+                   localTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
                 })
              });
              const data = await res.json();
