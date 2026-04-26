@@ -26,16 +26,16 @@ export default function LoginModal({ isOpen, onClose, reason }: Props) {
     const actionType = authMode;
 
     try {
-      let res;
+      let res: any;
       if (actionType === 'login') {
          res = await loginAction(formData);
       } else {
          res = await signupAction(formData);
       }
 
-      if (res.error) setError(res.error);
-      else if (res.message) setMessage(res.message);
-      else if (res.success) {
+      if (res?.error) setError(res.error);
+      else if (res?.message) setMessage(res.message);
+      else if (res?.success) {
          window.location.reload(); 
       }
     } catch (err: any) {
