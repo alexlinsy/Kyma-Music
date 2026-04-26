@@ -487,28 +487,44 @@ export default function Home() {
     if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
     const effectiveVolume = isTtsPlaying.current ? newVolume * 0.15 : newVolume;
 
-    // NetEase: directly set HTML Audio element volume
+    // NetEase: set volume + muted (iOS ignores .volume, but .muted works everywhere)
     if (neteaseAudioRef.current) {
-      neteaseAudioRef.current.volume = effectiveVolume;
+      try { neteaseAudioRef.current.volume = effectiveVolume; } catch (_) {}
+      neteaseAudioRef.current.muted = effectiveVolume === 0;
     }
 
-    // Spotify SDK volume
+    // Spotify: try SDK first, REST API as fallback (also works on mobile)
     if (player) {
       player.setVolume(effectiveVolume).catch(() => {
-        // SDK setVolume failed (common in production) — fall back to REST API
         if (token) {
           fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${Math.round(effectiveVolume * 100)}`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` },
-          }).catch((err: any) => log(`Vol REST err: ${err.message}`));
+          }).catch(() => {});
         }
       });
+    } else if (token && !neteaseAudioRef.current) {
+      // Mobile: SDK not available but REST API works
+      fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${Math.round(effectiveVolume * 100)}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => {});
     }
   }, [player, token, log]);
 
   const toggleMute = useCallback(() => {
-    if (isMuted) { handleVolumeChange(preMuteVolume || 0.5); setIsMuted(false); }
-    else { setPreMuteVolume(volume); handleVolumeChange(0); setIsMuted(true); }
+    if (isMuted) {
+      // Unmute
+      if (neteaseAudioRef.current) neteaseAudioRef.current.muted = false;
+      handleVolumeChange(preMuteVolume || 0.5);
+      setIsMuted(false);
+    } else {
+      // Mute — use .muted for mobile compatibility
+      setPreMuteVolume(volume);
+      if (neteaseAudioRef.current) neteaseAudioRef.current.muted = true;
+      handleVolumeChange(0);
+      setIsMuted(true);
+    }
   }, [isMuted, preMuteVolume, volume, handleVolumeChange]);
 
   useEffect(() => {
@@ -517,13 +533,22 @@ export default function Home() {
 
     const onPlay = () => {
       isTtsPlaying.current = true;
-      applyVolumeGradually(volumeRef.current * 0.15, 800);
+      // Mobile: use mute/unmute since volume control is restricted
+      if (neteaseAudioRef.current) {
+        neteaseAudioRef.current.muted = true;
+      } else {
+        applyVolumeGradually(volumeRef.current * 0.15, 800);
+      }
     };
 
     const onRestore = () => {
       if (!isTtsPlaying.current) return;
       isTtsPlaying.current = false;
-      applyVolumeGradually(volumeRef.current, 2000);
+      if (neteaseAudioRef.current) {
+        neteaseAudioRef.current.muted = false;
+      } else {
+        applyVolumeGradually(volumeRef.current, 2000);
+      }
     };
 
     const audio = audioRef.current;
