@@ -534,12 +534,16 @@ export default function Home() {
 
           <div className="relative flex flex-col items-center justify-center py-4">
             <div className="relative w-96 h-96 flex items-center justify-center">
-              <svg ref={svgRef} onClick={handleSeek} className="absolute inset-0 w-full h-full -rotate-90 overflow-visible z-30 cursor-pointer" viewBox="0 0 100 100">
+              <svg ref={svgRef} onClick={handleSeek} className="absolute inset-0 w-full h-full -rotate-90 overflow-visible z-30 cursor-pointer outline-none" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="45.5" fill="none" stroke="transparent" strokeWidth="8" />
                 <motion.circle cx="50" cy="50" r="45.5" fill="none" stroke="var(--kyma-primary)" strokeWidth="0.8" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: progressPercent / 100 }} style={{ filter: `drop-shadow(0 0 3px var(--kyma-glow))` }} transition={{ type: "tween", ease: "linear", duration: 1 }} />
               </svg>
+              
+              {/* Outer Shadow Container */}
+              <div className="absolute w-[90%] h-[90%] rounded-full shadow-2xl pointer-events-none z-0" />
+
               <div
-                className="relative w-[90%] h-[90%] rounded-full overflow-hidden z-10 border border-kyma-text/5 bg-kyma-panel drop-shadow-[0_15px_30px_rgba(0,0,0,0.4)]"
+                className="relative w-[90%] h-[90%] rounded-full overflow-hidden z-10"
                 style={{ WebkitMaskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)', maskImage: 'radial-gradient(circle, transparent 14%, black 14.5%)' }}
               >
                 <AnimatePresence mode="wait">

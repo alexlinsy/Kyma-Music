@@ -73,11 +73,11 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
                   <Sparkles size={20} className="text-kyma-primary" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Tune Your Brain</h2>
+                  <h2 className="text-xl font-bold text-kyma-text tracking-tight">Tune Your Brain</h2>
                   <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest mt-0.5">Musical Taste Corpus</p>
                 </div>
               </div>
-              <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+              <button onClick={onClose} className="text-zinc-500 hover:text-kyma-text/80 transition-colors">
                 <X size={24} />
               </button>
             </div>
@@ -93,7 +93,7 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
                   value={likedGenres}
                   onChange={(e) => setLikedGenres(e.target.value)}
                   placeholder="Jazz, Alternative, Techno, 80's City Pop..."
-                  className="w-full bg-kyma-text/5 border border-kyma-text/5 rounded-2xl p-4 text-sm text-kyma-text focus:outline-none focus:border-kyma-primary/50 transition-all min-h-[80px] resize-none"
+                  className="w-full bg-kyma-text/5 border border-kyma-text/5 rounded-2xl p-4 text-sm text-kyma-text focus:outline-none focus:border-kyma-primary/50 transition-all min-h-[80px] resize-none placeholder:text-kyma-text/40"
                 />
               </div>
 
@@ -107,7 +107,7 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
                   value={likedArtists}
                   onChange={(e) => setLikedArtists(e.target.value)}
                   placeholder="Daft Punk, Miles Davis, FKJ..."
-                  className="w-full bg-kyma-text/5 border border-kyma-text/5 rounded-2xl p-4 text-sm text-kyma-text focus:outline-none focus:border-kyma-primary/50 transition-all min-h-[80px] resize-none"
+                  className="w-full bg-kyma-text/5 border border-kyma-text/5 rounded-2xl p-4 text-sm text-kyma-text focus:outline-none focus:border-kyma-primary/50 transition-all min-h-[80px] resize-none placeholder:text-kyma-text/40"
                 />
               </div>
 
@@ -122,7 +122,7 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
                   value={dislikedGenres}
                   onChange={(e) => setDislikedGenres(e.target.value)}
                   placeholder="Rap, EDM, Heavy Metal..."
-                  className="w-full bg-white/5 border border-white/5 rounded-2xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-rose-500/30 transition-all"
+                  className="w-full bg-kyma-text/5 border border-kyma-text/5 rounded-2xl px-4 py-3 text-sm text-kyma-text focus:outline-none focus:border-rose-500/30 transition-all placeholder:text-kyma-text/40"
                 />
               </div>
             </div>

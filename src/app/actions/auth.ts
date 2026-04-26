@@ -19,6 +19,13 @@ export async function loginAction(formData: FormData) {
 }
 
 export async function signupAction(formData: FormData) {
+  const inviteCode = formData.get('inviteCode') as string;
+  const validCode = process.env.KYMA_INVITATION_CODE || '000000';
+
+  if (!inviteCode || inviteCode !== validCode) {
+    return { error: 'Invalid invitation code.' };
+  }
+
   const supabase = await createClient()
 
   const data = {
