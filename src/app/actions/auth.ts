@@ -43,3 +43,8 @@ export async function signupAction(formData: FormData) {
   revalidatePath('/', 'layout')
   return { success: true }
 }
+
+export async function verifyInviteCodeAction(code: string) {
+  const validCode = process.env.KYMA_INVITATION_CODE || '000000';
+  return code === validCode;
+}
