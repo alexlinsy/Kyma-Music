@@ -459,7 +459,7 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
-      <nav className="w-full h-14 border-b border-kyma-text/5 bg-kyma-bg/80 backdrop-blur-xl flex items-center px-6 justify-between sticky top-0 z-50 transition-colors duration-500">
+      <nav className="w-full h-14 border-b border-kyma-text/5 bg-kyma-bg/80 backdrop-blur-xl flex items-center px-4 md:px-6 justify-between sticky top-0 z-50 transition-colors duration-500">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-kyma-primary rounded-md flex items-center justify-center shadow-lg shadow-kyma-primary/20">
@@ -479,27 +479,27 @@ export default function Home() {
             </div>
           ) : (
             <button onClick={() => { setLoginReason(""); setIsLoginModalOpen(true); }} className="ml-2 pl-4 border-l border-kyma-text/10 text-[10px] font-bold uppercase tracking-wider text-kyma-text/70 hover:text-kyma-primary transition-colors flex items-center gap-1.5">
-               <UserIcon size={12} /> Log In / Sign Up
+               <UserIcon size={12} /> <span className="hidden md:inline">Log In / Sign Up</span>
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => requireAuth("Backing up Playlists to your base requires an account.", () => syncPlaylists(token))} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'} ${isSyncing ? 'opacity-50 cursor-wait' : ''}`}>
-            <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} /> <span className="text-[11px] font-bold uppercase tracking-wider">{isSyncing ? 'Syncing...' : 'Sync For Preference'}</span>
+        <div className="flex items-center gap-1 md:gap-2">
+          <button onClick={() => requireAuth("Backing up Playlists to your base requires an account.", () => syncPlaylists(token))} disabled={isSyncing} className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'} ${isSyncing ? 'opacity-50 cursor-wait' : ''}`}>
+            <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} /> <span className="hidden lg:inline text-[11px] font-bold uppercase tracking-wider">{isSyncing ? 'Syncing...' : 'Sync For Preference'}</span>
           </button>
-          <button onClick={() => requireAuth("Customizing Taste settings requires an account.", () => setIsTasteModalOpen(true))} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
-            <Heart size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Taste</span>
+          <button onClick={() => requireAuth("Customizing Taste settings requires an account.", () => setIsTasteModalOpen(true))} className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
+            <Heart size={14} /> <span className="hidden md:inline text-[11px] font-bold uppercase tracking-wider">Taste</span>
           </button>
-          <button onClick={() => requireAuth("Automating Routines requires an account.", () => setIsRoutineModalOpen(true))} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
-            <Calendar size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Routine</span>
+          <button onClick={() => requireAuth("Automating Routines requires an account.", () => setIsRoutineModalOpen(true))} className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
+            <Calendar size={14} /> <span className="hidden md:inline text-[11px] font-bold uppercase tracking-wider">Routine</span>
           </button>
-          <button onClick={() => requireAuth("Setting up Mood rules requires an account.", () => setIsMoodModalOpen(true))} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
-            <SlidersHorizontal size={14} /> <span className="text-[11px] font-bold uppercase tracking-wider">Mood</span>
+          <button onClick={() => requireAuth("Setting up Mood rules requires an account.", () => setIsMoodModalOpen(true))} className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
+            <SlidersHorizontal size={14} /> <span className="hidden md:inline text-[11px] font-bold uppercase tracking-wider">Mood</span>
           </button>
         </div>
       </nav>
 
-      <div className="max-w-[1200px] mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-12 relative">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-8 md:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 relative">
         <div className="lg:col-span-7 flex flex-col gap-8">
 
           <AnimatePresence>
@@ -533,7 +533,7 @@ export default function Home() {
           </div>
 
           <div className="relative flex flex-col items-center justify-center py-4">
-            <div className="relative w-96 h-96 flex items-center justify-center">
+            <div className="relative w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 flex items-center justify-center mx-auto">
               <svg ref={svgRef} onClick={handleSeek} className="absolute inset-0 w-full h-full -rotate-90 overflow-visible z-30 cursor-pointer outline-none" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="45.5" fill="none" stroke="transparent" strokeWidth="8" />
                 <motion.circle cx="50" cy="50" r="45.5" fill="none" stroke="var(--kyma-primary)" strokeWidth="0.8" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: progressPercent / 100 }} style={{ filter: `drop-shadow(0 0 3px var(--kyma-glow))` }} transition={{ type: "tween", ease: "linear", duration: 1 }} />
@@ -565,7 +565,7 @@ export default function Home() {
             </div>
 
             <div className="mt-10 text-center space-y-2">
-              <motion.h2 key={currentTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-2xl font-bold tracking-tight text-kyma-primary line-clamp-1 px-4">{currentTrack ? currentTrack.name : 'Ready to Broadcast'}</motion.h2>
+              <motion.h2 key={currentTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xl md:text-2xl font-bold tracking-tight text-kyma-primary line-clamp-1 px-4">{currentTrack ? currentTrack.name : 'Ready to Broadcast'}</motion.h2>
               <div className="flex flex-col items-center">
                 <motion.p key={currentTrack?.artists?.[0]?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[#a39e98] text-sm font-medium tracking-wide uppercase">{currentTrack ? currentTrack.artists.map((a: any) => a.name).join(', ') : 'Kyma Music'}</motion.p>
                 <span className="text-[10px] font-mono text-zinc-600 tabular-nums font-bold mt-1.5 opacity-80">{formatTime(progress.position)} / {formatTime(progress.duration)}</span>
@@ -573,7 +573,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-14 py-4">
+          <div className="flex items-center justify-center gap-10 md:gap-14 py-4">
             <button className="text-zinc-500 hover:text-kyma-text transition-all active:scale-90" onClick={() => player?.previousTrack()}><SkipBack size={32} /></button>
             <button onClick={togglePlay} className="w-20 h-20 bg-kyma-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-kyma-primary/40">
               {isPlaying ? <div className="w-6 h-6 bg-white rounded-sm" /> : <Play size={36} fill="white" className="ml-1.5" />}
@@ -595,6 +595,14 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-6 right-6 z-[90]">
+          <button onClick={() => setIsDevMode(!isDevMode)} className="p-2.5 rounded-full bg-white shadow-2xl transition-all border border-white hover:bg-zinc-50 group flex items-center justify-center">
+            <Terminal size={14} className={isDevMode ? 'text-kyma-primary' : 'text-black'} />
+          </button>
+        </div>
+      )}
 
       <TasteOnboarding isOpen={isTasteModalOpen} onClose={() => setIsTasteModalOpen(false)} initialData={userPrefs} onSave={(data) => { setUserPrefs(data); log("Taste updated."); }} />
       <RoutineSettings isOpen={isRoutineModalOpen} onClose={() => setIsRoutineModalOpen(false)} />
