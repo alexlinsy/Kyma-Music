@@ -55,7 +55,7 @@ const MoodSettings: React.FC<MoodSettingsProps> = ({ isOpen, onClose }) => {
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
-            className="bg-kyma-panel border border-kyma-text/10 rounded-2xl w-full max-w-2xl shadow-2xl text-kyma-text transition-colors duration-500"
+            className="bg-kyma-panel border border-kyma-text/10 rounded-2xl w-[calc(100%-1.5rem)] sm:w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl text-kyma-text transition-colors duration-500 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center p-6 border-b border-white/5">
@@ -74,7 +74,7 @@ const MoodSettings: React.FC<MoodSettingsProps> = ({ isOpen, onClose }) => {
                 </div>
               ) : (
                 <textarea
-                  className="w-full h-64 bg-black/40 p-4 rounded-xl border border-kyma-text/10 focus:ring-2 focus:ring-kyma-primary focus:outline-none font-mono text-sm resize-none custom-scrollbar"
+                  className="w-full h-[50vh] sm:h-64 bg-black/40 p-4 rounded-xl border border-kyma-text/10 focus:ring-2 focus:ring-kyma-primary focus:outline-none font-mono text-sm resize-none custom-scrollbar"
                   value={rules}
                   onChange={(e) => setRules(e.target.value)}
                   placeholder={"- Rainy Day: Cool Jazz, chill songs, etc..."}

@@ -60,7 +60,7 @@ export default function RoutineSettings({ isOpen, onClose }: RoutineSettingsProp
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-kyma-bg/80 backdrop-blur-sm" />
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-xl bg-kyma-panel border border-kyma-text/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden max-h-[80vh] flex flex-col text-kyma-text">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-[calc(100%-1.5rem)] sm:w-full max-w-xl bg-kyma-panel border border-kyma-text/10 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col text-kyma-text">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-kyma-primary/10 rounded-xl text-kyma-primary"><Clock size={20} /></div>
