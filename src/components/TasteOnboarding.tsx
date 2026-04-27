@@ -62,7 +62,7 @@ export default function TasteOnboarding({ isOpen, onClose, initialData, onSave }
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-[calc(100%-1.5rem)] sm:w-full max-w-lg bg-kyma-panel border border-kyma-text/10 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[85vh] text-kyma-text custom-scrollbar"
+            className="relative w-[calc(100%-1.5rem)] sm:w-full max-w-lg bg-kyma-panel border border-kyma-text/10 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl overflow-y-auto overflow-x-hidden max-h-[85vh] text-kyma-text custom-scrollbar"
           >
             {/* Background Glow */}
             <div className="absolute -top-24 -right-24 w-48 h-48 bg-kyma-primary/10 blur-[80px] rounded-full pointer-events-none" />
