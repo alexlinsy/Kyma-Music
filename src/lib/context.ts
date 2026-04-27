@@ -8,6 +8,7 @@ export interface UserContext {
   routines: string;
   moodRules: string;
   playlists: any;
+  history: string[];
 }
 
 import { createClient } from '@/lib/supabase/server';
@@ -16,7 +17,7 @@ export async function getContext(): Promise<UserContext> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const emptyContext = { taste: "No taste preference found.", routines: "No routines set.", moodRules: "No mood rules set.", playlists: [] };
+  const emptyContext = { taste: "No taste preference found.", routines: "No routines set.", moodRules: "No mood rules set.", playlists: [], history: [] };
   
   if (!user) return emptyContext;
 
@@ -35,11 +36,20 @@ Disliked Genres: ${prefs.taste?.dislikedGenres?.join(', ') || 'None'}`;
   const routines = prefs.routines?.length ? 
     prefs.routines.map((r: any) => `- ${r.time}: ${r.activity} (Music: ${r.musicStyle})`).join('\n') : "None set";
 
+  // Check for 3-day reset for persistent history
+  let history = prefs.played_history || [];
+  const lastCleared = prefs.history_last_cleared ? new Date(prefs.history_last_cleared) : null;
+  const now = new Date();
+  if (lastCleared && (now.getTime() - lastCleared.getTime()) > 3 * 24 * 60 * 60 * 1000) {
+    history = [];
+  }
+
   return { 
     taste, 
     routines, 
     moodRules: prefs.mood_rules || "No mood rules set.", 
-    playlists: prefs.playlists || [] 
+    playlists: prefs.playlists || [],
+    history
   };
 }
 
@@ -78,6 +88,6 @@ INSTRUCTIONS:
     "tracks": ["Title - Artist", ...],
     "reasoning": "Why this matches the user's routine/taste"
 }
-8. "speech" MUST BE ENGLISH ONLY.
+8. "speech" should match the language the user is using. If the user speaks Chinese, respond in Chinese but keep the cool, effortless DJ persona.
 `;
 }

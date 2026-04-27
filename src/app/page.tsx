@@ -36,6 +36,7 @@ export default function Home() {
   const [neteaseCookie, setNeteaseCookie] = useState<string>('');
   const [neteaseTrackState, setNeteaseTrackState] = useState<any>(null);
   const [neteaseIsPlaying, setNeteaseIsPlaying] = useState(false);
+  const [neteasePosition, setNeteasePosition] = useState(0);
   const [neteasePlayBlocked, setNeteasePlayBlocked] = useState(false);
   const [neteaseGeoBlocked, setNeteaseGeoBlocked] = useState(false);
   const neteaseAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -101,6 +102,21 @@ export default function Home() {
   const isNeteaseMode = !!neteaseCookie;
   const effectiveTrack = isNeteaseMode ? neteaseTrackState : currentTrack;
   const effectiveIsPlaying = isNeteaseMode ? neteaseIsPlaying : isPlaying;
+  const effectivePosition = isNeteaseMode ? neteasePosition : progress.position;
+  const effectiveDuration = isNeteaseMode ? (effectiveTrack?.duration || 0) : progress.duration;
+
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isNeteaseMode && neteaseIsPlaying) {
+      interval = setInterval(() => {
+        if (neteaseAudioRef.current) {
+          setNeteasePosition(neteaseAudioRef.current.currentTime * 1000);
+        }
+      }, 500);
+    }
+    return () => clearInterval(interval);
+  }, [isNeteaseMode, neteaseIsPlaying]);
 
   const log = useCallback((msg: string) => {
     setDebugLog(prev => {
@@ -124,6 +140,19 @@ export default function Home() {
     setIsProviderModalOpen(true);
     return false;
   };
+
+  const updatePersistentHistory = useCallback(async (trackName: string, artists: string) => {
+    const trackStr = `${trackName} - ${artists}`;
+    try {
+      await fetch('/api/user/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ track: trackStr })
+      });
+    } catch (err) {
+      console.error('Failed to update persistent history:', err);
+    }
+  }, []);
 
   const checkAILimit = (): boolean => {
     if (!requireMusicProvider()) return false;
@@ -253,13 +282,41 @@ export default function Home() {
           body: JSON.stringify({ action: 'search', params: { keyword: trackName, limit: 1 }, cookie: neteaseCookie })
         });
         const data = await res.json();
-        const rawTrack = data.result?.songs?.[0];
+        let rawTrack = data.result?.songs?.[0];
         if (rawTrack) {
+          // If search result is "thin" (missing picUrl), fetch full song details
+          const albumObj = rawTrack.album || rawTrack.al || {};
+          let picUrl = albumObj.picUrl || rawTrack.al?.picUrl || rawTrack.picUrl || '';
+          
+          if (!picUrl && rawTrack.id) {
+            log(`Thin result for ${rawTrack.name}. Fetching details...`);
+            const detailRes = await fetch('/api/netease', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'songDetail', params: { id: rawTrack.id }, cookie: neteaseCookie })
+            });
+            const detailData = await detailRes.json();
+            const detailedTrack = detailData.songs?.[0];
+            if (detailedTrack) {
+              rawTrack = { ...rawTrack, ...detailedTrack };
+              picUrl = detailedTrack.al?.picUrl || detailedTrack.album?.picUrl || '';
+            }
+          }
+
           log(`Playing (NetEase): ${rawTrack.name}`);
+          
+          // Force HTTPS and higher quality
+          if (picUrl && picUrl.startsWith('http:')) picUrl = picUrl.replace('http:', 'https:');
+          if (picUrl && !picUrl.includes('?param=')) picUrl += '?param=400y400';
+
+          log(`Track: ${rawTrack.name}, Pic: ${picUrl ? 'Found' : 'Missing'}`);
+          
           await playNeteaseTrack({
-            id: rawTrack.id, name: rawTrack.name,
-            artists: rawTrack.artists || [], album: rawTrack.album || { name: '', picUrl: '' },
-            duration: rawTrack.duration || 0,
+            id: rawTrack.id, 
+            name: rawTrack.name,
+            artists: rawTrack.artists || rawTrack.ar || [], 
+            album: { name: (rawTrack.album?.name || rawTrack.al?.name || ''), picUrl },
+            duration: rawTrack.duration || rawTrack.dt || 0,
           });
           return true;
         }
@@ -333,7 +390,7 @@ export default function Home() {
   const manualSkip = () => { log("Skip button clicked."); moveToNext(); };
 
   const handleSeek = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!player || !progress.duration || !svgRef.current) return;
+    if (!effectiveDuration || !svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -341,9 +398,17 @@ export default function Home() {
     let normalizedAngle = angle + 90;
     if (normalizedAngle < 0) normalizedAngle += 360;
     const percentage = normalizedAngle / 360;
-    const seekMs = Math.floor(percentage * progress.duration);
-    setProgress(prev => ({ ...prev, position: seekMs }));
-    player.seek(seekMs).catch((err: any) => log(`Seek err: ${err.message}`));
+    const seekMs = Math.floor(percentage * effectiveDuration);
+    
+    if (isNeteaseMode) {
+      if (neteaseAudioRef.current) {
+        neteaseAudioRef.current.currentTime = seekMs / 1000;
+        setNeteasePosition(seekMs);
+      }
+    } else if (player) {
+      setProgress(prev => ({ ...prev, position: seekMs }));
+      player.seek(seekMs).catch((err: any) => log(`Seek err: ${err.message}`));
+    }
   };
 
   useEffect(() => {
@@ -380,13 +445,16 @@ export default function Home() {
   const trackHistoryRef = useRef<string[]>([]);
 
   useEffect(() => {
-    if (currentTrack?.name) {
-      if (!trackHistoryRef.current.includes(currentTrack.name)) {
-        trackHistoryRef.current.push(currentTrack.name);
-        if (trackHistoryRef.current.length > 50) trackHistoryRef.current.shift();
+    if (effectiveTrack?.name) {
+      const artistStr = effectiveTrack.artists.map((a: any) => a.name).join(', ');
+      const trackStr = `${effectiveTrack.name} - ${artistStr}`;
+      
+      if (!trackHistoryRef.current.includes(trackStr)) {
+        trackHistoryRef.current = [trackStr, ...trackHistoryRef.current].slice(0, 50);
+        updatePersistentHistory(effectiveTrack.name, artistStr);
       }
     }
-  }, [currentTrack?.name]);
+  }, [effectiveTrack?.id, updatePersistentHistory]);
 
   useEffect(() => {
     if (currentTrack?.id && isReady) {
@@ -626,7 +694,7 @@ export default function Home() {
     return `${Math.floor(totalSeconds / 60)}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
   };
 
-  const progressPercent = progress.duration > 0 ? (progress.position / progress.duration) * 100 : 0;
+  const progressPercent = effectiveDuration > 0 ? (effectivePosition / effectiveDuration) * 100 : 0;
 
   return (
     <main className="min-h-screen bg-kyma-bg text-kyma-text selection:bg-kyma-primary/30 font-inter text-sm transition-colors duration-500 relative overflow-hidden z-0">
@@ -792,7 +860,12 @@ export default function Home() {
                 <AnimatePresence mode="wait">
                   <motion.div key={effectiveTrack?.id || 'empty'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="w-full h-full rounded-full overflow-hidden relative group">
                     {(effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl) ? (
-                      <img src={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl} alt={effectiveTrack?.name} className={`w-full h-full object-cover transition-transform duration-700 ${effectiveIsPlaying ? 'animate-[spin_40s_linear_infinite]' : 'scale-95 opacity-80'}`} />
+                      <img 
+                        src={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl} 
+                        alt={effectiveTrack?.name} 
+                        className={`w-full h-full object-cover transition-transform duration-700 ${effectiveIsPlaying ? 'animate-[spin_40s_linear_infinite]' : 'scale-95 opacity-80'}`} 
+                        onError={(e) => log(`Image Load Failed: ${e.currentTarget.src.substring(0, 40)}...`)}
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-kyma-primary/10 transition-colors duration-500"><Music size={40} className="text-kyma-primary/60" /></div>
                     )}
@@ -811,7 +884,7 @@ export default function Home() {
               <motion.h2 key={effectiveTrack?.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xl md:text-2xl font-bold tracking-tight text-kyma-primary line-clamp-1 px-4">{effectiveTrack ? effectiveTrack.name : 'Ready to Broadcast'}</motion.h2>
               <div className="flex flex-col items-center">
                 <motion.p key={effectiveTrack?.artists?.[0]?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[#a39e98] text-sm font-medium tracking-wide uppercase">{effectiveTrack ? effectiveTrack.artists.map((a: any) => a.name).join(', ') : 'Kyma Music'}</motion.p>
-                <span className="text-[10px] font-mono text-zinc-600 tabular-nums font-bold mt-1.5 opacity-80">{formatTime(isNeteaseMode ? (neteaseAudioRef.current ? neteaseAudioRef.current.currentTime * 1000 : 0) : progress.position)} / {formatTime(isNeteaseMode ? (effectiveTrack?.duration || 0) : progress.duration)}</span>
+                <span className="text-[10px] font-mono text-zinc-600 tabular-nums font-bold mt-1.5 opacity-80">{formatTime(effectivePosition)} / {formatTime(effectiveDuration)}</span>
               </div>
             </div>
           </div>

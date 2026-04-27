@@ -16,7 +16,7 @@ interface ChatWindowProps {
 
 export default function ChatWindow({ onResponse, onSendRequest, history = [] }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: "Hello, I'm Kyma. What's on your mind today?" }
+    { role: 'assistant', content: "Hello, I'm Kyma. What's on your mind today? (English / 中文)" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -104,7 +104,7 @@ export default function ChatWindow({ onResponse, onSendRequest, history = [] }: 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Talk to Kyma..."
+            placeholder="Talk to Kyma (English / 中文)..."
             className="w-full bg-kyma-bg text-kyma-text text-sm rounded-lg py-2.5 px-4 pr-10 focus:outline-none border border-kyma-text/10 focus:border-kyma-primary/50 transition-all placeholder:text-zinc-600"
           />
           <button 

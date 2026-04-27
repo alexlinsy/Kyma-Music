@@ -73,6 +73,9 @@ export async function POST(req: Request) {
       case 'search':
         url = `https://music.163.com/api/search/get?s=${encodeURIComponent(params.keyword)}&type=1&limit=${params.limit || 20}`;
         break;
+      case 'songDetail':
+        url = `https://music.163.com/api/v3/song/detail?ids=[${params.id}]`;
+        break;
       case 'lyric':
         url = `https://music.163.com/api/song/lyric?id=${params.id}&lv=1&tv=-1`;
         break;

@@ -12,7 +12,15 @@ export async function askGemini(userInput: string, environment: any, type: strin
     };
   }
   const context = await getContext();
-  const systemPrompt = buildSystemPrompt(context, environment);
+  
+  // Merge session history with persistent history from Supabase
+  const combinedHistory = Array.from(new Set([
+    ...(environment.history || []),
+    ...(context.history || [])
+  ])).slice(0, 50);
+
+  const envWithHistory = { ...environment, history: combinedHistory };
+  const systemPrompt = buildSystemPrompt(context, envWithHistory);
   
   const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash-lite",
@@ -25,7 +33,7 @@ export async function askGemini(userInput: string, environment: any, type: strin
     System Context:
     ${systemPrompt}
     
-    CRITICAL: YOU MUST RESPOND IN ENGLISH ONLY. NO CHINESE CHARACTERS ALLOWED IN "speech".
+    CRITICAL: Match the user's language. If the user communicates in Chinese, you MUST respond in Chinese for the "speech".
     
     Task: The user's Spotify player just started playing the track: ${userInput}.
     Provide a very short, punchy, engaging AI DJ commentary (maximum 2 sentences) about this specific track. 
@@ -38,7 +46,7 @@ export async function askGemini(userInput: string, environment: any, type: strin
     System Context:
     ${systemPrompt}
     
-    CRITICAL: YOU MUST RESPOND IN ENGLISH ONLY. NO CHINESE CHARACTERS ALLOWED IN "speech".
+    CRITICAL: Match the user's language. If the user communicates in Chinese, you MUST respond in Chinese for the "speech".
     
     User Input: ${userInput}
     
@@ -59,6 +67,15 @@ export async function askGemini(userInput: string, environment: any, type: strin
     const cleanJson = text.replace(/```json\n?/, '').replace(/```\n?$/, '').trim();
     const parsed = JSON.parse(cleanJson);
     
+    // FILTERING: Remove tracks that are in the combined history
+    if (parsed.tracks?.length > 0) {
+      const originalCount = parsed.tracks.length;
+      parsed.tracks = parsed.tracks.filter((t: string) => !combinedHistory.includes(t));
+      if (parsed.tracks.length < originalCount) {
+         console.log(`[Gemini] Filtered out ${originalCount - parsed.tracks.length} duplicate tracks.`);
+      }
+    }
+
     // Remove annoying conversation fillers that LLMs tend to generate
     if (parsed.speech) {
       parsed.speech = parsed.speech.replace(/^(ah,|ah!|ah |oh,|oh!|oh )/i, '').trim();

@@ -44,7 +44,10 @@ export function useNeteaseMusic(cookie: string, options?: UseNeteaseMusicOptions
         id: track.id,
         name: track.name,
         artists: track.artists || track.ar || [],
-        album: track.al || track.album || { name: '', picUrl: '' },
+        album: {
+          name: track.album?.name || track.al?.name || '',
+          picUrl: (track.album?.picUrl || track.al?.picUrl || track.picUrl || '').replace(/^http:/, 'https:') + (track.album?.picUrl || track.al?.picUrl || track.picUrl ? '?param=400y400' : '')
+        },
         duration: track.duration || track.dt || 0,
       }));
     } catch (err) {
