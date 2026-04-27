@@ -701,15 +701,15 @@ export default function Home() {
       {/* Dynamic Ambient Album Background */}
       <div className="absolute inset-0 pointer-events-none z-[-1]">
         <AnimatePresence>
-          {effectiveIsPlaying && (effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl) && (
+          {(effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl) && (
             <motion.img
               key={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
               src={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
               initial={{ opacity: 0, scale: 1.2 }}
               animate={{ opacity: isLightMode ? 0.45 : 0.35, scale: 1.5 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 2, ease: "easeInOut" }}
-              className="w-full h-full object-cover blur-[140px] transform-gpu saturate-150"
+              transition={{ duration: 2.5, ease: "easeInOut" }}
+              className="w-full h-full object-cover blur-[110px] transform-gpu saturate-150 will-change-[opacity,transform]"
             />
           )}
         </AnimatePresence>
