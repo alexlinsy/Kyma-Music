@@ -44,7 +44,7 @@ export default function ChatWindow({ onResponse, onSendRequest, history = [] }: 
         body: JSON.stringify({ 
           message: userMsg, 
           history,
-          localTime: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+          localTime: new Date().toLocaleString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true }) + ' (' + Intl.DateTimeFormat().resolvedOptions().timeZone + ')'
         })
       });
       const data = await res.json();

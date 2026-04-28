@@ -68,7 +68,7 @@ MOOD RULES:
 ${context.moodRules}
 
 CURRENT ENVIRONMENT:
-- Time: ${environment.time}
+- User's Local Time: ${environment.time}
 - Weather: ${environment.weather || 'Unknown'}
 - Activity: ${environment.activity || 'Unknown'}
 
