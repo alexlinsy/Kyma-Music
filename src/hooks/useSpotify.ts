@@ -110,9 +110,9 @@ export function useSpotify(token: string, onTrackEnded?: () => void) {
       interval = setInterval(() => {
         setProgress(prev => ({
           ...prev,
-          position: Math.min(prev.position + 1000, prev.duration)
+          position: Math.min(prev.position + 100, prev.duration)
         }));
-      }, 1000);
+      }, 100);
     }
     return () => clearInterval(interval);
   }, [isPlaying]);

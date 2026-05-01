@@ -126,6 +126,127 @@ export default function Home() {
     console.log(`[Kyma] ${msg}`);
   }, []);
 
+  // --- Govee Sync ---
+  const [isLanMode, setIsLanMode] = useState(true);
+  const lastGoveeColor = useRef<{ r: number, g: number, b: number } | null>(null);
+
+  const syncGoveeColor = useCallback(async (r: number, g: number, b: number) => {
+    // Keep Govee sync restricted to Dev Mode
+    if (!isDevMode) return;
+
+    // Avoid redundant calls if color is very similar
+    if (lastGoveeColor.current &&
+      Math.abs(lastGoveeColor.current.r - r) < 15 &&
+      Math.abs(lastGoveeColor.current.g - g) < 15 &&
+      Math.abs(lastGoveeColor.current.b - b) < 15) {
+      // Still need to trigger if mode changed, but we handle that in the toggle useEffect
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/govee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ r, g, b, forceCloud: !isLanMode })
+      });
+      if (res.ok) {
+        lastGoveeColor.current = { r, g, b };
+        const data = await res.json();
+        log(`Govee synced (${data.mode || 'cloud'}): rgb(${r},${g},${b})`);
+      }
+    } catch (e) {}
+  }, [log, isLanMode]);
+
+  const [bgColors, setBgColors] = useState<{ top: string, mid: string, bottom: string }>({
+    top: 'rgba(0,0,0,0)',
+    mid: 'rgba(0,0,0,0)',
+    bottom: 'rgba(0,0,0,0)'
+  });
+  const [extractedRgb, setExtractedRgb] = useState<{ top: any, mid: any, bottom: any } | null>(null);
+
+  // Re-sync when mode toggles
+  useEffect(() => {
+    if (extractedRgb?.mid) {
+      syncGoveeColor(extractedRgb.mid.r, extractedRgb.mid.g, extractedRgb.mid.b);
+    }
+  }, [isLanMode, extractedRgb?.mid, syncGoveeColor]);
+
+  const extractColorFromImage = useCallback((url: string) => {
+    if (!url) return;
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = url;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      canvas.width = 10;
+      canvas.height = 30; // 10x30 to have enough vertical resolution for 3 parts
+      ctx.drawImage(img, 0, 0, 10, 30);
+      const data = ctx.getImageData(0, 0, 10, 30).data;
+
+      const getAverage = (startIndex: number, endIndex: number) => {
+        let rSum = 0, gSum = 0, bSum = 0, totalWeight = 0;
+        for (let i = startIndex; i < endIndex; i += 4) {
+          if (data[i + 3] < 128) continue; 
+          const r = data[i], g = data[i+1], b = data[i+2];
+          
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const diff = max - min;
+          
+          // AGGRESSIVE VIBRANCY FILTER:
+          // If the color is too close to white/grey/black, ignore it.
+          if (diff < 40) continue; 
+          
+          // Exponential weight for saturation: the more colorful, the more it counts!
+          const weight = Math.pow(diff / 255, 2); 
+
+          rSum += r * weight;
+          gSum += g * weight;
+          bSum += b * weight;
+          totalWeight += weight;
+        }
+        
+        // Fallback to simple average if no vibrant pixels found
+        if (totalWeight === 0) {
+           let r = 0, g = 0, b = 0, count = 0;
+           for (let i = startIndex; i < endIndex; i += 4) {
+             r += data[i]; g += data[i+1]; b += data[i+2]; count++;
+           }
+           return { r: Math.round(r/count), g: Math.round(g/count), b: Math.round(b/count) };
+        }
+        
+        return { 
+          r: Math.round(rSum / totalWeight), 
+          g: Math.round(gSum / totalWeight), 
+          b: Math.round(bSum / totalWeight) 
+        };
+      };
+
+      // Top 30%, Whole image (Major), Bottom 30%
+      const top = getAverage(0, 10 * 9 * 4); // First 9 rows
+      const mid = getAverage(0, 10 * 30 * 4); // ALL rows for the truly major color
+      const bottom = getAverage(10 * 21 * 4, 10 * 30 * 4); // Last 9 rows
+
+      setBgColors({
+        top: `rgb(${top.r}, ${top.g}, ${top.b})`,
+        mid: `rgb(${mid.r}, ${mid.g}, ${mid.b})`,
+        bottom: `rgb(${bottom.r}, ${bottom.g}, ${bottom.b})`
+      });
+      setExtractedRgb({ top, mid, bottom });
+
+      // Sync only the Mid Color to the lamp
+      syncGoveeColor(mid.r, mid.g, mid.b);
+      
+      log(`Lamp Synced: rgb(${mid.r},${mid.g},${mid.b})`);
+    };
+    img.onerror = () => {
+      console.warn('[Kyma] Failed to load album art for color extraction');
+    };
+  }, [syncGoveeColor, log]);
+
+
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   // Show the music-provider picker if no service is connected yet.
@@ -445,16 +566,22 @@ export default function Home() {
   const trackHistoryRef = useRef<string[]>([]);
 
   useEffect(() => {
-    if (effectiveTrack?.name) {
+    if (effectiveTrack?.id) {
       const artistStr = effectiveTrack.artists.map((a: any) => a.name).join(', ');
       const trackStr = `${effectiveTrack.name} - ${artistStr}`;
-      
+
       if (!trackHistoryRef.current.includes(trackStr)) {
         trackHistoryRef.current = [trackStr, ...trackHistoryRef.current].slice(0, 50);
         updatePersistentHistory(effectiveTrack.name, artistStr);
       }
+
+      // Sync Govee color
+      const albumArt = effectiveTrack.album?.images?.[0]?.url || effectiveTrack.album?.picUrl;
+      if (albumArt) {
+        extractColorFromImage(albumArt);
+      }
     }
-  }, [effectiveTrack?.id, updatePersistentHistory]);
+  }, [effectiveTrack?.id, updatePersistentHistory, extractColorFromImage]);
 
   useEffect(() => {
     if (currentTrack?.id && isReady) {
@@ -501,7 +628,7 @@ export default function Home() {
       const timer = setTimeout(announce, 2000);
       return () => clearTimeout(timer);
     }
-  }, [currentTrack?.id, isReady, log, speak]); // Use empty array to avoid HMR size change errors during development
+  }, [currentTrack?.id, isReady, log, speak, currentTrack, checkAILimit, player]); 
 
   useEffect(() => {
     const handleFirstInteraction = () => {
@@ -699,18 +826,28 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-kyma-bg text-kyma-text selection:bg-kyma-primary/30 font-inter text-sm transition-colors duration-500 relative overflow-hidden z-0">
       {/* Dynamic Ambient Album Background */}
-      <div className="absolute inset-0 pointer-events-none z-[-1]">
+      <div className="absolute inset-0 pointer-events-none z-[-1] overflow-hidden">
         <AnimatePresence>
           {(effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl) && (
-            <motion.img
-              key={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
-              src={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
-              initial={{ opacity: 0, scale: 1.2 }}
-              animate={{ opacity: isLightMode ? 0.45 : 0.35, scale: 1.5 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 2.5, ease: "easeInOut" }}
-              className="w-full h-full object-cover blur-[110px] transform-gpu saturate-150 will-change-[opacity,transform]"
-            />
+            <>
+              <motion.img
+                key={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
+                src={effectiveTrack?.album?.images?.[0]?.url || effectiveTrack?.album?.picUrl}
+                initial={{ opacity: 0, scale: 1.2 }}
+                animate={{ opacity: isLightMode ? 0.45 : 0.35, scale: 1.5 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 2.5, ease: "easeInOut" }}
+                className="w-full h-full object-cover blur-[110px] transform-gpu saturate-150 will-change-[opacity,transform]"
+              />
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 mix-blend-soft-light opacity-50"
+                style={{ 
+                  background: `linear-gradient(to bottom, ${bgColors.top}, ${bgColors.mid}, ${bgColors.bottom})`
+                }}
+              />
+            </>
           )}
         </AnimatePresence>
       </div>
@@ -749,6 +886,15 @@ export default function Home() {
           <button onClick={() => requireAuth("Automating Routines requires an account.", () => setIsRoutineModalOpen(true))} className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <Calendar size={14} /> <span className="hidden md:inline text-[11px] font-bold uppercase tracking-wider">Routine</span>
           </button>
+          {isDevMode && (
+            <button 
+              onClick={() => setIsLanMode(!isLanMode)}
+              className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-full transition-all border ${isLanMode ? 'border-emerald-500/20 text-emerald-500 bg-emerald-500/10' : 'border-zinc-500/20 text-zinc-500 bg-zinc-500/5 hover:border-emerald-500/20 hover:text-emerald-500'}`}
+            >
+              <Disc size={14} className={isLanMode ? "animate-spin" : ""} /> 
+              <span className="hidden md:inline text-[11px] font-bold uppercase tracking-wider">{isLanMode ? "LAN Sync" : "Cloud Sync"}</span>
+            </button>
+          )}
           <button onClick={() => requireAuth("Setting up Mood rules requires an account.", () => setIsMoodModalOpen(true))} className={`flex items-center gap-2 px-2.5 md:px-3 py-1.5 rounded-full transition-all border border-transparent ${isLightMode ? 'text-kyma-primary/70 hover:text-kyma-primary hover:bg-kyma-primary/10 hover:border-kyma-primary/20' : 'text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/10'}`}>
             <SlidersHorizontal size={14} /> <span className="hidden md:inline text-[11px] font-bold uppercase tracking-wider">Mood</span>
           </button>
