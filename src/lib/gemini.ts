@@ -70,7 +70,14 @@ export async function askGemini(userInput: string, environment: any, type: strin
     // FILTERING: Remove tracks that are in the combined history
     if (parsed.tracks?.length > 0) {
       const originalCount = parsed.tracks.length;
-      parsed.tracks = parsed.tracks.filter((t: string) => !combinedHistory.includes(t));
+      if (parsed.isDirectRequest) {
+        // Keep the first track (the requested one), filter the rest
+        const first = parsed.tracks[0];
+        const rest = parsed.tracks.slice(1).filter((t: string) => !combinedHistory.includes(t));
+        parsed.tracks = [first, ...rest];
+      } else {
+        parsed.tracks = parsed.tracks.filter((t: string) => !combinedHistory.includes(t));
+      }
       if (parsed.tracks.length < originalCount) {
          console.log(`[Gemini] Filtered out ${originalCount - parsed.tracks.length} duplicate tracks.`);
       }
