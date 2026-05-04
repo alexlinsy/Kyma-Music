@@ -10,12 +10,26 @@ export function useSpotify(token: string, onTrackEnded?: () => void) {
   const [progress, setProgress] = useState({ position: 0, duration: 0 });
   const [error, setError] = useState<string | null>(null);
   
+  const playerTokenRef = useRef<string | null>(null);
   const onTrackEndedRef = useRef(onTrackEnded);
   const lastEndedUriRef = useRef<string | null>(null);
 
   useEffect(() => {
     onTrackEndedRef.current = onTrackEnded;
   }, [onTrackEnded]);
+
+  // Handle token changes and player cleanup
+  useEffect(() => {
+    if (player && (!token || playerTokenRef.current !== token)) {
+      console.log("Token changed or removed. Cleaning up old Spotify Player...");
+      player.disconnect();
+      setPlayer(null);
+      setDeviceId(null);
+      setIsReady(false);
+      setError(null);
+      playerTokenRef.current = null;
+    }
+  }, [token, player]);
 
   const connectPlayer = useCallback(async (existingPlayer: any) => {
     if (!existingPlayer) return;
@@ -31,7 +45,7 @@ export function useSpotify(token: string, onTrackEnded?: () => void) {
   }, []);
 
   const initPlayer = useCallback(async () => {
-    if (!token || player) return;
+    if (!token || (player && playerTokenRef.current === token)) return;
 
     try {
       await initSpotifySDK();
@@ -94,6 +108,7 @@ export function useSpotify(token: string, onTrackEnded?: () => void) {
       spotifyPlayer.addListener('account_error', ({ message }: any) => setError(`Account Error (Premium Required): ${message}`));
 
       spotifyPlayer.connect();
+      playerTokenRef.current = token;
       setPlayer(spotifyPlayer);
     } catch (err: any) {
       setError(`Setup error: ${err.message}`);

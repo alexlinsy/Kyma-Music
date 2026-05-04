@@ -312,7 +312,11 @@ export default function Home() {
           const retryAfter = r.headers.get('Retry-After');
           return { error: 'rate_limit', retryAfter: parseInt(retryAfter || '5') };
         }
-        if (!r.ok) return { error: r.status };
+        if (!r.ok) {
+          let errBody = '';
+          try { errBody = await r.text(); } catch (e) {}
+          return { error: r.status, details: errBody };
+        }
         return r.json();
       };
 
@@ -324,7 +328,7 @@ export default function Home() {
         collections.push({ name: "Liked Songs", id: "liked-songs", description: "Your top picks", tracks });
         log(`Fetched ${tracks.length} liked songs.`);
       } else {
-        log("Could not fetch liked songs.");
+        log(`Could not fetch liked songs: ${likedData?.error} - ${likedData?.details || 'Unknown'}`);
       }
 
       await sleep(1000);
@@ -334,7 +338,7 @@ export default function Home() {
       const plData = await spotifyFetch('https://api.spotify.com/v1/me/playlists?limit=8');
 
       if (plData && plData.error) {
-        log(`Playlist fetch stopped: ${plData.error}`);
+        log(`Playlist fetch stopped: ${plData.error} - ${plData.details || 'Unknown'}`);
       } else if (plData && plData.items && plData.items.length > 0) {
         log(`Found ${plData.items.length} playlists. Syncing details...`);
         for (const pl of plData.items) {
@@ -446,17 +450,31 @@ export default function Home() {
         const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(trackName)}&type=track&limit=1`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        if (!searchRes.ok) {
+          const errText = await searchRes.text().catch(()=>'');
+          log(`Spotify Search Failed: ${searchRes.status} ${errText}`);
+          return false;
+        }
         const searchData = await searchRes.json();
         const trackUri = searchData.tracks?.items[0]?.uri;
         if (trackUri) {
           log(`Playing (Spotify): ${trackName}`);
-          await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+          const playRes = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ uris: [trackUri], position_ms: 0 })
           });
+          if (!playRes.ok) {
+            const playErr = await playRes.text().catch(()=>'');
+            log(`Spotify Play Failed: ${playRes.status} ${playErr}`);
+          }
           return true;
+        } else {
+          log(`Spotify Search found no tracks for: ${trackName}`);
         }
+      } else if (token && !deviceId) {
+        log("Cannot play: Spotify Device ID not ready yet. Attempting to connect...");
+        if (player) connect();
       }
       return false;
     } catch (err: any) { log(`Play error: ${err.message}`); return false; }
@@ -811,7 +829,18 @@ export default function Home() {
       return;
     }
     if (!token) { window.location.href = '/api/auth/spotify'; return; }
-    if (player) { if (!isReady) connect(); player.togglePlay(); }
+    if (player) { 
+      if (!isReady) connect(); 
+      if (!currentTrack) {
+        log("No track loaded. Asking AI to start the radio...");
+        moveToNext();
+      } else {
+        player.togglePlay(); 
+      }
+    } else if (token) {
+      log("Spotify SDK initializing. Asking AI to start the radio...");
+      moveToNext();
+    }
   };
 
   // Volume control functions moved up to fix Temporal Dead Zone
